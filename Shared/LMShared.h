@@ -73,6 +73,12 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 // the folder where iOS keeps the rendered app icons
 #define LMSystemIconsCacheFolder @"/var/containers/Shared/SystemGroup/systemgroup.com.apple.lsd.iconscache/Library/Caches"
 
+// LumenBoardHelper is a root LaunchDaemon: deletes the contents of LMSystemIconsCacheFolder (the folder belongs to a system user)
+// when it gets LMNotifyHelperWipe, writes what happened to LMHelperResultPath and posts LMNotifyHelperDone
+#define LMNotifyHelperWipe "com.xsxs18.lumenboard/helper-wipe"
+#define LMNotifyHelperDone "com.xsxs18.lumenboard/helper-done"
+#define LMHelperResultPath [LMDataDirectory stringByAppendingPathComponent:@"RebuildHelper.txt"]
+
 // Deletes everything in LMSystemIconsCacheFolder and says what happened:
 // Found, Deleted, Failed, Remaining (what's still there afterwards) and Error (the first thing that went wrong)
 static inline NSDictionary *LMWipeSystemIconsCache(void) {

@@ -326,6 +326,11 @@ static void LMRebuildIcons(void) {
     LMRestartIconAgent();
     usleep(300 * 1000);
     NSMutableDictionary *wipe = [LMWipeSystemIconsCache() mutableCopy];
+    if ([wipe[@"Failed"] unsignedIntegerValue] || wipe[@"Error"]) {
+      notify_post(LMNotifyHelperWipe); // the root daemon does it
+      usleep(500 * 1000);
+      wipe[@"Remaining"] = @([[[NSFileManager defaultManager] contentsOfDirectoryAtPath:LMSystemIconsCacheFolder error:nil] count]);
+    }
     wipe[@"Date"] = [NSDate date];
     [wipe writeToFile:LMStatusPath(@"Rebuild") atomically:YES]; // for the diagnostics page
     LMReportProgress(UINT32_MAX, UINT32_MAX);

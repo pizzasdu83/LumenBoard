@@ -85,6 +85,7 @@ static void LMAppendRebuild(NSMutableString *report, NSString *who, NSDictionary
     return;
   }
   [report appendFormat:@"  %@: %@, found %@, deleted %@, failed %@, left %@%@\n", who, LMDateString(status[@"Date"]), status[@"Found"] ? : @"-", status[@"Deleted"] ? : @"-", status[@"Failed"] ? : @"-", status[@"Remaining"] ? : @"-", status[@"Error"] ? [NSString stringWithFormat:@" (%@)", status[@"Error"]] : @""];
+  if (status[@"Helper"]) [report appendFormat:@"      root helper: %@\n", status[@"Helper"]];
 }
 
 static void LMAppendProcess(NSMutableString *report, NSString *name, NSDictionary *status, NSString *missing) {

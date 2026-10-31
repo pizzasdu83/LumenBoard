@@ -2,14 +2,74 @@
 #import "LMConfigStore.h"
 #import <notify.h>
 
-// what deleting the icon cache did, in one or two lines
+// The icon cache folder belongs to a system user, so LumenBoardHelper (a LaunchDaemon that runs as root, it only deletes what's
+// inside that folder) does it when it gets the notification.
+// Returns Helper (what happened to it) and, if it answered, Found, Deleted, Failed and Error.
+static NSDictionary *LMWipeWithRootHelper(void) {
+  NSString *resultPath = LMHelperResultPath;
+  [[NSFileManager defaultManager] removeItemAtPath:resultPath error:nil]; // an old result is no answer
+
+  dispatch_semaphore_t answered = dispatch_semaphore_create(0);
+  int token = NOTIFY_TOKEN_INVALID;
+  notify_register_dispatch(LMNotifyHelperDone, &token, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^(int ignored) {
+    dispatch_semaphore_signal(answered);
+  });
+  notify_post(LMNotifyHelperWipe);
+  BOOL timedOut = dispatch_semaphore_wait(answered, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4 * NSEC_PER_SEC))) != 0;
+  if (token != NOTIFY_TOKEN_INVALID) notify_cancel(token);
+
+  // the helper writes key=value lines
+  NSMutableDictionary *values = [NSMutableDictionary new];
+  NSString *output = [NSString stringWithContentsOfFile:resultPath encoding:NSUTF8StringEncoding error:nil] ? : @"";
+  for (NSString *line in [output componentsSeparatedByString:@"\n"]) {
+    NSRange equals = [line rangeOfString:@"="];
+    if (equals.location != NSNotFound) values[[line substringToIndex:equals.location]] = [line substringFromIndex:NSMaxRange(equals)];
+  }
+  NSMutableDictionary *result = [NSMutableDictionary new];
+  NSString *euid = values[@"euid"];
+  if (!euid) {
+    result[@"Helper"] = timedOut ? @"didn't answer, it isn't running (install LumenBoard again or reboot)" : @"answered without a result";
+    return result;
+  }
+  result[@"Helper"] = [euid isEqualToString:@"0"] ? @"ran as root" : [NSString stringWithFormat:@"ran as uid %@, not root", euid];
+  if (values[@"found"]) {
+    result[@"Found"] = @([values[@"found"] integerValue]);
+    result[@"Deleted"] = @([values[@"deleted"] integerValue]);
+    result[@"Failed"] = @([values[@"failed"] integerValue]);
+  }
+  if (values[@"error"]) result[@"Error"] = values[@"error"];
+  return result;
+}
+
+// Deletes the icon cache as mobile first, then as root if that isn't allowed. LumenBoard isn't sandboxed, SpringBoard might not be allowed to do it.
+static NSMutableDictionary *LMWipeIconsCache(void) {
+  NSMutableDictionary *wipe = [LMWipeSystemIconsCache() mutableCopy];
+  if (![wipe[@"Failed"] unsignedIntegerValue] && !wipe[@"Error"]) return wipe;
+  NSDictionary *root = LMWipeWithRootHelper();
+  wipe[@"Helper"] = root[@"Helper"];
+  if (root[@"Found"]) {
+    wipe[@"Found"] = root[@"Found"];
+    wipe[@"Deleted"] = root[@"Deleted"];
+    wipe[@"Failed"] = root[@"Failed"];
+    if (root[@"Error"]) wipe[@"Error"] = root[@"Error"];
+    else [wipe removeObjectForKey:@"Error"];
+  } else if (root[@"Error"]) {
+    wipe[@"Error"] = root[@"Error"];
+  }
+  wipe[@"Remaining"] = @([[[NSFileManager defaultManager] contentsOfDirectoryAtPath:LMSystemIconsCacheFolder error:nil] count]);
+  return wipe;
+}
+
+// what deleting the icon cache did, in a few lines
 static NSString *LMWipeSummary(NSDictionary *wipe) {
   NSUInteger found = [wipe[@"Found"] unsignedIntegerValue], deleted = [wipe[@"Deleted"] unsignedIntegerValue], failed = [wipe[@"Failed"] unsignedIntegerValue];
-  NSString *error = wipe[@"Error"];
-  if (error && !found) return [NSString stringWithFormat:LMLocalized(@"Couldn't read the icon cache folder: %@"), error];
-  if (failed) return [NSString stringWithFormat:LMLocalized(@"Deleted %lu of %lu items, %lu couldn't be deleted (%@)."), (unsigned long)deleted, (unsigned long)found, (unsigned long)failed, error ? : @""];
-  if (!found) return LMLocalized(@"The icon cache folder was already empty.");
-  return [NSString stringWithFormat:LMLocalized(@"Deleted %lu items from the icon cache."), (unsigned long)deleted];
+  NSString *error = wipe[@"Error"], *summary;
+  if (error && !found) summary = [NSString stringWithFormat:LMLocalized(@"Couldn't read the icon cache folder: %@"), error];
+  else if (failed) summary = [NSString stringWithFormat:LMLocalized(@"Deleted %lu of %lu items, %lu couldn't be deleted (%@)."), (unsigned long)deleted, (unsigned long)found, (unsigned long)failed, error ? : @""];
+  else if (!found) summary = LMLocalized(@"The icon cache folder was already empty.");
+  else summary = [NSString stringWithFormat:LMLocalized(@"Deleted %lu items from the icon cache."), (unsigned long)deleted];
+  if (wipe[@"Helper"] && (error || failed)) summary = [summary stringByAppendingFormat:@"\n%@", [NSString stringWithFormat:LMLocalized(@"Root helper: %@"), wipe[@"Helper"]]];
+  return summary;
 }
 
 @implementation LMApplyViewController {
@@ -111,8 +171,8 @@ static NSString *LMWipeSummary(NSDictionary *wipe) {
     [weakSelf showProgress:(uint32_t)(state >> 32) of:(uint32_t)(state & 0xFFFFFFFF)];
   });
   if (_rebuildOnly) {
-    // LumenBoard isn't sandboxed, SpringBoard might not be allowed to delete there. Do it here and show what happened.
-    NSMutableDictionary *wipe = [LMWipeSystemIconsCache() mutableCopy];
+    // do it here (SpringBoard might not be allowed to) and show what happened
+    NSMutableDictionary *wipe = LMWipeIconsCache();
     wipe[@"Date"] = [NSDate date];
     [wipe writeToFile:LMStatusPath(@"RebuildApp") atomically:YES];
     _wipeSummary = LMWipeSummary(wipe);

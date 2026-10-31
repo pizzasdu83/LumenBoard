@@ -61,3 +61,4 @@
 "Deleted %lu of %lu items, %lu couldn't be deleted (%@)." = "%lu von %lu Elementen gelöscht, %lu konnten nicht gelöscht werden (%@).";
 "The icon cache folder was already empty." = "Der Icon-Cache-Ordner war schon leer.";
 "Deleted %lu items from the icon cache." = "%lu Elemente aus dem Icon-Cache gelöscht.";
+"Root helper: %@" = "Root-Helper: %@";

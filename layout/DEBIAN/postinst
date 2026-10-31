@@ -11,6 +11,13 @@ mkdir -p "$JB/var/mobile/Library/LumenBoard" "$JB/Library/Themes"
 chown -R mobile:mobile "$JB/var/mobile/Library/LumenBoard" 2>/dev/null
 chmod 0755 "$JB/var/mobile/Library/LumenBoard"
 
+# the helper that deletes the icon cache of iOS: a LaunchDaemon that runs as root
+chown root:wheel "$JB/usr/libexec/LumenBoardHelper" "$JB/Library/LaunchDaemons/com.xsxs18.lumenboard.helper.plist" 2>/dev/null
+chmod 0755 "$JB/usr/libexec/LumenBoardHelper" 2>/dev/null
+chmod 0644 "$JB/Library/LaunchDaemons/com.xsxs18.lumenboard.helper.plist" 2>/dev/null
+launchctl unload "$JB/Library/LaunchDaemons/com.xsxs18.lumenboard.helper.plist" 2>/dev/null
+launchctl load -w "$JB/Library/LaunchDaemons/com.xsxs18.lumenboard.helper.plist" 2>/dev/null
+
 killall -9 iconservicesagent 2>/dev/null
 uicache -p "$JB/Applications/LumenBoard.app" 2>/dev/null || uicache 2>/dev/null
 exit 0

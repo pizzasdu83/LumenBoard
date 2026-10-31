@@ -1,0 +1,11 @@
+#!/bin/sh
+# roothide runs this inside the jbroot, so its paths have no prefix
+if [ "$DPKG_MAINTSCRIPT_ARCH" = "iphoneos-arm64e" ]; then
+  JB=""
+else
+  JB=/var/jb
+  [ -d "$JB" ] || JB=""
+fi
+
+launchctl unload "$JB/Library/LaunchDaemons/com.xsxs18.lumenboard.helper.plist" 2>/dev/null
+exit 0

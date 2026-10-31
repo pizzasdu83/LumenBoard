@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.4
+- "Rebuild icons" can now really delete the icon cache: the folder belongs to a system user, so a small root LaunchDaemon (LumenBoardHelper, like the one of Filza) deletes what is inside it
+
 ## 1.1.2
 - "Rebuild icons" now deletes the icon cache from the app itself (SpringBoard may not be allowed to), shows how many items were deleted and lists the result in Diagnostics
 
