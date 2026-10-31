@@ -21,9 +21,14 @@
     _enabledThemes = [themes isKindOfClass:[NSArray class]] ? [themes copy] : @[];
     _useSystemIconShape = [config[LMConfigUseSystemIconShape] boolValue];
     _keepIconsInDarkAndTinted = [config[LMConfigKeepIconsInDarkAndTinted] boolValue];
+    NSString *revision = config[LMConfigCustomIconsRevision];
+    _customIconsRevision = [revision isKindOfClass:[NSString class]] ? [revision copy] : @"";
     // what SpringBoard last applied, so the app knows about pending changes even after a restart
     NSDictionary *applied = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath][LMMapAppliedConfig];
-    _appliedConfig = [applied isKindOfClass:[NSDictionary class]] ? applied : [self dictionaryRepresentation];
+    NSMutableDictionary *appliedConfig = [[self dictionaryRepresentation] mutableCopy];
+    // maps from older versions don't know every key, those keep the current value
+    if ([applied isKindOfClass:[NSDictionary class]]) [appliedConfig addEntriesFromDictionary:applied];
+    _appliedConfig = appliedConfig;
   }
   return self;
 }
@@ -32,7 +37,8 @@
   return @{
     LMConfigEnabledThemes : _enabledThemes ? : @[],
     LMConfigUseSystemIconShape : @(_useSystemIconShape),
-    LMConfigKeepIconsInDarkAndTinted : @(_keepIconsInDarkAndTinted)
+    LMConfigKeepIconsInDarkAndTinted : @(_keepIconsInDarkAndTinted),
+    LMConfigCustomIconsRevision : _customIconsRevision ? : @""
   };
 }
 
@@ -46,6 +52,11 @@
   if (!data || ![data writeToFile:LMConfigPath options:NSDataWritingAtomic error:error]) return NO;
   chmod(LMConfigPath.fileSystemRepresentation, 0644);
   return YES;
+}
+
+- (BOOL)customIconsDidChange:(NSError **)error {
+  _customIconsRevision = [NSUUID UUID].UUIDString;
+  return [self save:error];
 }
 
 - (void)markApplied {

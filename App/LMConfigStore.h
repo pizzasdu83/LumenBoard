@@ -10,6 +10,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSArray<NSString *> *enabledThemes;
 @property (nonatomic) BOOL useSystemIconShape;
 @property (nonatomic) BOOL keepIconsInDarkAndTinted;
+// changes whenever a custom icon is added, replaced or removed, so "Apply" knows there is something to do
+@property (nonatomic, copy, readonly) NSString *customIconsRevision;
+// call after the CustomIcons folder changed, saves the config
+- (BOOL)customIconsDidChange:(NSError **)error;
 // changed since the last apply
 @property (nonatomic, readonly) BOOL hasUnappliedChanges;
 

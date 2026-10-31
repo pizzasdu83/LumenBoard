@@ -1,6 +1,7 @@
 #import "LMThemesViewController.h"
 #import "LMSettingsViewController.h"
 #import "LMApplyViewController.h"
+#import "LMCustomIconsViewController.h"
 #import "LMConfigStore.h"
 #import "../Shared/LMThemeLibrary.h"
 #import <ImageIO/ImageIO.h>
@@ -95,7 +96,10 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   self.tableView.rowHeight = 64;
   self.tableView.allowsSelectionDuringEditing = YES;
 
-  self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"gearshape"] style:UIBarButtonItemStylePlain target:self action:@selector(showSettings)];
+  UIBarButtonItem *settingsItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"gearshape"] style:UIBarButtonItemStylePlain target:self action:@selector(showSettings)];
+  UIBarButtonItem *customIconsItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"photo.on.rectangle"] style:UIBarButtonItemStylePlain target:self action:@selector(showCustomIcons)];
+  customIconsItem.accessibilityLabel = LMLocalized(@"Custom icons");
+  self.navigationItem.leftBarButtonItems = @[settingsItem, customIconsItem];
   self.navigationItem.rightBarButtonItem = self.editButtonItem;
 
   __weak typeof(self) weakSelf = self;
@@ -290,6 +294,10 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 
 - (void)showSettings {
   [self.navigationController pushViewController:[LMSettingsViewController new] animated:YES];
+}
+
+- (void)showCustomIcons {
+  [self.navigationController pushViewController:[LMCustomIconsViewController new] animated:YES];
 }
 
 - (void)apply {
