@@ -67,6 +67,7 @@ static NSString *LMThemeSubfolder(NSString *themeDirectory, NSString *folder) {
 static os_unfair_lock LMLibraryLock = OS_UNFAIR_LOCK_INIT;
 static NSMutableDictionary *LMFolderCache; // "<theme>/<folder>" -> parsed icons
 static NSMutableDictionary *LMReadErrors; // "<theme>/<folder>" -> why it couldn't be listed
+static NSString *const LMCustomIconsCacheKey = @"\n/CustomIcons"; // can't clash with a theme folder
 
 @implementation LMThemeLibrary
 
@@ -88,15 +89,15 @@ static NSMutableDictionary *LMReadErrors; // "<theme>/<folder>" -> why it couldn
   return [theme.pathExtension caseInsensitiveCompare:@"theme"] == NSOrderedSame ? theme.stringByDeletingPathExtension : theme;
 }
 
-+ (NSDictionary<NSString *, NSDictionary *> *)iconsInFolder:(NSString *)folder ofTheme:(NSString *)theme {
-  if (!theme.length) return @{};
-  NSString *cacheKey = [theme stringByAppendingPathComponent:folder];
++ (NSDictionary<NSString *, NSDictionary *> *)cachedIconsForKey:(NSString *)cacheKey {
   os_unfair_lock_lock(&LMLibraryLock);
   NSDictionary *cached = LMFolderCache[cacheKey];
   os_unfair_lock_unlock(&LMLibraryLock);
-  if (cached) return cached;
+  return cached;
+}
 
-  NSString *directory = LMThemeSubfolder([LMThemesDirectory stringByAppendingPathComponent:theme], folder);
+// Parses the icon files in one folder and caches the result. directory == nil: the folder doesn't exist, so it has no icons.
++ (NSDictionary<NSString *, NSDictionary *> *)loadIconsInDirectory:(NSString *)directory label:(NSString *)label cacheKey:(NSString *)cacheKey {
   NSArray *files = directory ? nil : @[];
   NSError *error;
   // listing can fail for a moment (e.g. too many open files), that's not "no icons"
@@ -105,7 +106,7 @@ static NSMutableDictionary *LMReadErrors; // "<theme>/<folder>" -> why it couldn
     files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:directory error:&error];
   }
   if (!files) {
-    NSString *reason = [NSString stringWithFormat:@"%@: %@", folder, error.localizedDescription ? : @"unknown error"];
+    NSString *reason = [NSString stringWithFormat:@"%@: %@", label, error.localizedDescription ? : @"unknown error"];
     NSLog(@"[LumenBoard] can't list %@: %@", directory, reason);
     os_unfair_lock_lock(&LMLibraryLock);
     if (!LMReadErrors) LMReadErrors = [NSMutableDictionary new];
@@ -140,6 +141,24 @@ static NSMutableDictionary *LMReadErrors; // "<theme>/<folder>" -> why it couldn
   return result;
 }
 
++ (NSDictionary<NSString *, NSDictionary *> *)iconsInFolder:(NSString *)folder ofTheme:(NSString *)theme {
+  if (!theme.length) return @{};
+  NSString *cacheKey = [theme stringByAppendingPathComponent:folder];
+  NSDictionary *cached = [self cachedIconsForKey:cacheKey];
+  if (cached) return cached;
+  NSString *directory = LMThemeSubfolder([LMThemesDirectory stringByAppendingPathComponent:theme], folder);
+  return [self loadIconsInDirectory:directory label:folder cacheKey:cacheKey];
+}
+
++ (NSDictionary<NSString *, NSDictionary *> *)customIcons {
+  NSDictionary *cached = [self cachedIconsForKey:LMCustomIconsCacheKey];
+  if (cached) return cached;
+  BOOL isDirectory = NO;
+  NSString *path = LMCustomIconsDirectory;
+  NSString *directory = ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] && isDirectory) ? path : nil;
+  return [self loadIconsInDirectory:directory label:@"CustomIcons" cacheKey:LMCustomIconsCacheKey];
+}
+
 + (NSDictionary<NSString *, NSDictionary *> *)iconsInTheme:(NSString *)theme {
   return [self iconsInFolder:@"IconBundles" ofTheme:theme];
 }
@@ -149,7 +168,8 @@ static NSMutableDictionary *LMReadErrors; // "<theme>/<folder>" -> why it couldn
 }
 
 + (NSDictionary<NSString *, NSDictionary *> *)resolvedIconsForThemes:(NSArray<NSString *> *)themes appNames:(NSDictionary<NSString *, NSArray<NSString *> *> *)appNames {
-  NSMutableDictionary *resolved = [NSMutableDictionary new];
+  // icons picked in the app win over every theme
+  NSMutableDictionary *resolved = [[self customIcons] mutableCopy];
   for (NSString *theme in themes) {
     if (![theme isKindOfClass:[NSString class]]) continue;
     [[self iconsInTheme:theme] enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSDictionary *icon, BOOL *stop) {
@@ -179,6 +199,13 @@ static NSMutableDictionary *LMReadErrors; // "<theme>/<folder>" -> why it couldn
     [LMFolderCache removeObjectForKey:key];
     [LMReadErrors removeObjectForKey:key];
   }
+  os_unfair_lock_unlock(&LMLibraryLock);
+}
+
++ (void)invalidateCustomIcons {
+  os_unfair_lock_lock(&LMLibraryLock);
+  [LMFolderCache removeObjectForKey:LMCustomIconsCacheKey];
+  [LMReadErrors removeObjectForKey:LMCustomIconsCacheKey];
   os_unfair_lock_unlock(&LMLibraryLock);
 }
 

@@ -104,18 +104,19 @@ static BOOL LMWriteIconMap(void) {
   NSArray *themes = [config[LMConfigEnabledThemes] isKindOfClass:[NSArray class]] ? config[LMConfigEnabledThemes] : @[];
   BOOL systemShape = [config[LMConfigUseSystemIconShape] boolValue];
   BOOL keepAppearance = [config[LMConfigKeepIconsInDarkAndTinted] boolValue];
+  NSString *customRevision = [config[LMConfigCustomIconsRevision] isKindOfClass:[NSString class]] ? config[LMConfigCustomIconsRevision] : @"";
 
   [LMThemeLibrary invalidate];
   BOOL usesAppNames = NO;
   for (NSString *theme in themes) usesAppNames = usesAppNames || ([theme isKindOfClass:[NSString class]] && [LMThemeLibrary iconsByAppNameInTheme:theme].count);
   NSDictionary *icons = [LMThemeLibrary resolvedIconsForThemes:themes appNames:(usesAppNames ? LMInstalledAppNames() : nil)];
 
-  NSDictionary *appliedConfig = @{ LMConfigEnabledThemes : themes, LMConfigUseSystemIconShape : @(systemShape), LMConfigKeepIconsInDarkAndTinted : @(keepAppearance) };
+  NSDictionary *appliedConfig = @{ LMConfigEnabledThemes : themes, LMConfigUseSystemIconShape : @(systemShape), LMConfigKeepIconsInDarkAndTinted : @(keepAppearance), LMConfigCustomIconsRevision : customRevision };
 
   // hash everything that changes how an icon looks. Paths are saved as jailbreak paths (roothide renames the jbroot).
   NSString *style = [NSString stringWithFormat:@"v%d shape=%d keep=%d", LMMapVersion, systemShape, keepAppearance];
   NSMutableDictionary *entries = [NSMutableDictionary new], *materials = [NSMutableDictionary new];
-  NSMutableString *content = [NSMutableString stringWithFormat:@"%@\n%@\n", style, [themes componentsJoinedByString:@"/"]];
+  NSMutableString *content = [NSMutableString stringWithFormat:@"%@\n%@\n%@\n", style, [themes componentsJoinedByString:@"/"], customRevision];
   for (NSString *bundleID in [icons.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
     NSDictionary *icon = icons[bundleID];
     NSMutableDictionary *entry = [NSMutableDictionary new];

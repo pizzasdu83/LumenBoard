@@ -43,6 +43,8 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 #define LMDataDirectory LMRootPath(@"/var/mobile/Library/LumenBoard")
 #define LMConfigPath [LMDataDirectory stringByAppendingPathComponent:@"Config.plist"]
 #define LMIconMapPath [LMDataDirectory stringByAppendingPathComponent:@"IconMap.plist"]
+// icons picked in the app: CustomIcons/<lowercased bundle id>.png. They win over every theme.
+#define LMCustomIconsDirectory [LMDataDirectory stringByAppendingPathComponent:@"CustomIcons"]
 
 #define LMNotifyApply "com.xsxs18.lumenboard/apply"
 #define LMNotifyClearCache "com.xsxs18.lumenboard/clear-cache"
@@ -54,6 +56,7 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 #define LMConfigEnabledThemes @"EnabledThemes" // theme folder names, first one wins
 #define LMConfigUseSystemIconShape @"UseSystemIconShape"
 #define LMConfigKeepIconsInDarkAndTinted @"KeepIconsInDarkAndTinted"
+#define LMConfigCustomIconsRevision @"CustomIconsRevision" // changes whenever a custom icon is added, replaced or removed
 
 // IconMap.plist
 #define LMMapVersion 2 // 2: icon paths are jailbreak paths

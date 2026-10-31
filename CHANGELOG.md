@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+- New: pick your own icon for any app right in LumenBoard (photo button at the top left). Choose the app, then an image from Photos (with crop) or Files. No Filza needed
+- Custom icons win over every theme and can be changed or removed at any time
+
 ## 1.0.3
 - Fixed themes randomly showing "0 icons" and no preview, for example while your package manager is still installing themes
 - Themes that change while LumenBoard is open (installed, updated, removed) are picked up right away
