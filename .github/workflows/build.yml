@@ -1,4 +1,4 @@
-name: Build
+name: Changing the lights
 
 on:
   push:
