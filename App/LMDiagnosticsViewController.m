@@ -79,6 +79,14 @@ static unsigned long long LMCount(NSDictionary *status, NSString *counter) {
   return [counters isKindOfClass:[NSDictionary class]] ? [counters[counter] unsignedLongLongValue] : 0;
 }
 
+static void LMAppendRebuild(NSMutableString *report, NSString *who, NSDictionary *status) {
+  if (!status) {
+    [report appendFormat:@"  %@: nothing\n", who];
+    return;
+  }
+  [report appendFormat:@"  %@: %@, found %@, deleted %@, failed %@, left %@%@\n", who, LMDateString(status[@"Date"]), status[@"Found"] ? : @"-", status[@"Deleted"] ? : @"-", status[@"Failed"] ? : @"-", status[@"Remaining"] ? : @"-", status[@"Error"] ? [NSString stringWithFormat:@" (%@)", status[@"Error"]] : @""];
+}
+
 static void LMAppendProcess(NSMutableString *report, NSString *name, NSDictionary *status, NSString *missing) {
   [report appendFormat:@"\n%@\n", name];
   if (!status) {
@@ -169,6 +177,10 @@ static NSString *LMDiagnosticsReport(void) {
   } else {
     [report appendString:@"  none\n"];
   }
+
+  [report appendString:@"\nLast \"Rebuild icons\"\n"];
+  LMAppendRebuild(report, @"LumenBoard app", [NSDictionary dictionaryWithContentsOfFile:LMStatusPath(@"RebuildApp")]);
+  LMAppendRebuild(report, @"SpringBoard", [NSDictionary dictionaryWithContentsOfFile:LMStatusPath(@"Rebuild")]);
 
   LMAppendProcess(report, @"SpringBoard", springBoard, @"LumenBoardCore isn't loaded in SpringBoard");
   LMAppendProcess(report, @"iconservicesagent", agent, @"not loaded there, or not allowed to write (normal on Dopamine)");

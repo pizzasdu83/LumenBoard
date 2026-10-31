@@ -70,6 +70,41 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 
 // Status-<name>.plist: what the tweak did in SpringBoard, in iconservicesagent and on the last apply. Shown on the diagnostics page.
 #define LMStatusPath(name) [LMDataDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"Status-%@.plist", name]]
+// the folder where iOS keeps the rendered app icons
+#define LMSystemIconsCacheFolder @"/var/containers/Shared/SystemGroup/systemgroup.com.apple.lsd.iconscache/Library/Caches"
+
+// Deletes everything in LMSystemIconsCacheFolder and says what happened:
+// Found, Deleted, Failed, Remaining (what's still there afterwards) and Error (the first thing that went wrong)
+static inline NSDictionary *LMWipeSystemIconsCache(void) {
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  NSMutableDictionary *result = [NSMutableDictionary new];
+  NSError *listError;
+  NSArray *items = [fileManager contentsOfDirectoryAtPath:LMSystemIconsCacheFolder error:&listError];
+  if (!items) {
+    result[@"Found"] = @0;
+    result[@"Deleted"] = @0;
+    result[@"Failed"] = @0;
+    result[@"Remaining"] = @0;
+    result[@"Error"] = listError.localizedDescription ? : @"can't read the folder";
+    return result;
+  }
+  NSUInteger deleted = 0, failed = 0;
+  for (NSString *item in items) {
+    NSError *itemError;
+    if ([fileManager removeItemAtPath:[LMSystemIconsCacheFolder stringByAppendingPathComponent:item] error:&itemError]) {
+      deleted++;
+    } else {
+      failed++;
+      if (!result[@"Error"]) result[@"Error"] = [NSString stringWithFormat:@"%@: %@", item, itemError.localizedDescription ? : @"unknown error"];
+    }
+  }
+  result[@"Found"] = @(items.count);
+  result[@"Deleted"] = @(deleted);
+  result[@"Failed"] = @(failed);
+  result[@"Remaining"] = @([[fileManager contentsOfDirectoryAtPath:LMSystemIconsCacheFolder error:nil] count]);
+  return result;
+}
+
 #define LMStatusLoaded @"Loaded"
 #define LMStatusUpdated @"Updated"
 #define LMStatusHooksInstalled @"HooksInstalled"

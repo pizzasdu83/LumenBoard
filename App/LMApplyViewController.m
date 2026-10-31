@@ -2,9 +2,20 @@
 #import "LMConfigStore.h"
 #import <notify.h>
 
+// what deleting the icon cache did, in one or two lines
+static NSString *LMWipeSummary(NSDictionary *wipe) {
+  NSUInteger found = [wipe[@"Found"] unsignedIntegerValue], deleted = [wipe[@"Deleted"] unsignedIntegerValue], failed = [wipe[@"Failed"] unsignedIntegerValue];
+  NSString *error = wipe[@"Error"];
+  if (error && !found) return [NSString stringWithFormat:LMLocalized(@"Couldn't read the icon cache folder: %@"), error];
+  if (failed) return [NSString stringWithFormat:LMLocalized(@"Deleted %lu of %lu items, %lu couldn't be deleted (%@)."), (unsigned long)deleted, (unsigned long)found, (unsigned long)failed, error ? : @""];
+  if (!found) return LMLocalized(@"The icon cache folder was already empty.");
+  return [NSString stringWithFormat:LMLocalized(@"Deleted %lu items from the icon cache."), (unsigned long)deleted];
+}
+
 @implementation LMApplyViewController {
   BOOL _clearIconCache;
   BOOL _rebuildOnly;
+  NSString *_wipeSummary;
   BOOL _springBoardAnswered;
   int _progressToken;
   UIImageView *_symbol;
@@ -99,8 +110,21 @@
     notify_get_state(token, &state);
     [weakSelf showProgress:(uint32_t)(state >> 32) of:(uint32_t)(state & 0xFFFFFFFF)];
   });
-  notify_post(_rebuildOnly ? LMNotifyRebuild : (_clearIconCache ? LMNotifyClearCache : LMNotifyApply));
-  if (!_rebuildOnly) [[LMConfigStore sharedStore] markApplied];
+  if (_rebuildOnly) {
+    // LumenBoard isn't sandboxed, SpringBoard might not be allowed to delete there. Do it here and show what happened.
+    NSMutableDictionary *wipe = [LMWipeSystemIconsCache() mutableCopy];
+    wipe[@"Date"] = [NSDate date];
+    [wipe writeToFile:LMStatusPath(@"RebuildApp") atomically:YES];
+    _wipeSummary = LMWipeSummary(wipe);
+    _statusLabel.text = _wipeSummary;
+    // SpringBoard stops the icon agent, deletes again and resprings
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      notify_post(LMNotifyRebuild);
+    });
+  } else {
+    notify_post(_clearIconCache ? LMNotifyClearCache : LMNotifyApply);
+    [[LMConfigStore sharedStore] markApplied];
+  }
 
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
     [weakSelf showFailureIfSpringBoardIsSilent];
@@ -111,7 +135,7 @@
   _springBoardAnswered = YES;
   if (done == UINT32_MAX || !total) {
     _progressView.progress = 1;
-    _statusLabel.text = LMLocalized(@"Respringing…");
+    _statusLabel.text = _wipeSummary ? [NSString stringWithFormat:@"%@\n%@", _wipeSummary, LMLocalized(@"Respringing…")] : LMLocalized(@"Respringing…");
     return;
   }
   [_progressView setProgress:(float)done / total animated:YES];

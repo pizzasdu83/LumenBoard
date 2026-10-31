@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.2
+- "Rebuild icons" now deletes the icon cache from the app itself (SpringBoard may not be allowed to), shows how many items were deleted and lists the result in Diagnostics
+
 ## 1.1.1
 - New: "Rebuild icons" in Settings deletes the icon cache of iOS and respring
 

@@ -183,15 +183,6 @@ static void LMClearSystemIconCache(void) {
   ]) [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
 }
 
-// everything iOS cached for icons, it draws them again from the current map after the respring
-static void LMWipeIconsCacheFolder(void) {
-  NSString *folder = @"/var/containers/Shared/SystemGroup/systemgroup.com.apple.lsd.iconscache/Library/Caches";
-  NSFileManager *fileManager = [NSFileManager defaultManager];
-  for (NSString *item in [fileManager contentsOfDirectoryAtPath:folder error:nil]) {
-    [fileManager removeItemAtPath:[folder stringByAppendingPathComponent:item] error:nil];
-  }
-}
-
 // the descriptors SpringBoard uses for home screen icons, main thread only
 static NSArray *LMHomeScreenDescriptors(void) {
   BOOL pad = [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad;
@@ -334,7 +325,9 @@ static void LMRebuildIcons(void) {
     // the agent first, so it doesn't write its cache again while it's being deleted
     LMRestartIconAgent();
     usleep(300 * 1000);
-    LMWipeIconsCacheFolder();
+    NSMutableDictionary *wipe = [LMWipeSystemIconsCache() mutableCopy];
+    wipe[@"Date"] = [NSDate date];
+    [wipe writeToFile:LMStatusPath(@"Rebuild") atomically:YES]; // for the diagnostics page
     LMReportProgress(UINT32_MAX, UINT32_MAX);
     dispatch_async(dispatch_get_main_queue(), ^{
       usleep(500 * 1000); // the app shows "Respringing…"
