@@ -4,6 +4,7 @@
 
 @implementation LMApplyViewController {
   BOOL _clearIconCache;
+  BOOL _rebuildOnly;
   BOOL _springBoardAnswered;
   int _progressToken;
   UIImageView *_symbol;
@@ -23,6 +24,11 @@
     sheet.detents = @[[UISheetPresentationControllerDetent mediumDetent]];
     sheet.preferredCornerRadius = 28;
   }
+  return self;
+}
+
+- (instancetype)initWithRebuildingOnly {
+  if ((self = [self initWithClearingIconCache:YES])) _rebuildOnly = YES;
   return self;
 }
 
@@ -93,8 +99,8 @@
     notify_get_state(token, &state);
     [weakSelf showProgress:(uint32_t)(state >> 32) of:(uint32_t)(state & 0xFFFFFFFF)];
   });
-  notify_post(_clearIconCache ? LMNotifyClearCache : LMNotifyApply);
-  [[LMConfigStore sharedStore] markApplied];
+  notify_post(_rebuildOnly ? LMNotifyRebuild : (_clearIconCache ? LMNotifyClearCache : LMNotifyApply));
+  if (!_rebuildOnly) [[LMConfigStore sharedStore] markApplied];
 
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
     [weakSelf showFailureIfSpringBoardIsSilent];

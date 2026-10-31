@@ -48,6 +48,7 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 
 #define LMNotifyApply "com.xsxs18.lumenboard/apply"
 #define LMNotifyClearCache "com.xsxs18.lumenboard/clear-cache"
+#define LMNotifyRebuild "com.xsxs18.lumenboard/rebuild" // wipes the icon cache of iOS and resprings, nothing else
 #define LMNotifyMapChanged "com.xsxs18.lumenboard/map-changed"
 // state = (done << 32) | total, done == UINT32_MAX when SpringBoard is about to respring
 #define LMNotifyProgress "com.xsxs18.lumenboard/progress"

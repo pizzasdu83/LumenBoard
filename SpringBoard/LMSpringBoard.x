@@ -183,6 +183,15 @@ static void LMClearSystemIconCache(void) {
   ]) [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
 }
 
+// everything iOS cached for icons, it draws them again from the current map after the respring
+static void LMWipeIconsCacheFolder(void) {
+  NSString *folder = @"/var/containers/Shared/SystemGroup/systemgroup.com.apple.lsd.iconscache/Library/Caches";
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  for (NSString *item in [fileManager contentsOfDirectoryAtPath:folder error:nil]) {
+    [fileManager removeItemAtPath:[folder stringByAppendingPathComponent:item] error:nil];
+  }
+}
+
 // the descriptors SpringBoard uses for home screen icons, main thread only
 static NSArray *LMHomeScreenDescriptors(void) {
   BOOL pad = [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad;
@@ -316,6 +325,28 @@ static void LMApply(BOOL clearCache) {
   });
 }
 
+// "Rebuild icons": wipe the icon cache and respring, no theme work
+static void LMRebuildIcons(void) {
+  static BOOL rebuilding;
+  if (rebuilding) return;
+  rebuilding = YES;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    // the agent first, so it doesn't write its cache again while it's being deleted
+    LMRestartIconAgent();
+    usleep(300 * 1000);
+    LMWipeIconsCacheFolder();
+    LMReportProgress(UINT32_MAX, UINT32_MAX);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      usleep(500 * 1000); // the app shows "Respringing…"
+      LMRespring();
+    });
+  });
+}
+
+static void LMRebuildNotification(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
+  dispatch_async(dispatch_get_main_queue(), ^{ LMRebuildIcons(); });
+}
+
 static void LMApplyNotification(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
   BOOL clearCache = CFEqual(name, CFSTR(LMNotifyClearCache));
   dispatch_async(dispatch_get_main_queue(), ^{ LMApply(clearCache); });
@@ -333,5 +364,6 @@ static void LMApplyNotification(CFNotificationCenterRef center, void *observer, 
     CFNotificationCenterRef center = CFNotificationCenterGetDarwinNotifyCenter();
     CFNotificationCenterAddObserver(center, NULL, LMApplyNotification, CFSTR(LMNotifyApply), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
     CFNotificationCenterAddObserver(center, NULL, LMApplyNotification, CFSTR(LMNotifyClearCache), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
+    CFNotificationCenterAddObserver(center, NULL, LMRebuildNotification, CFSTR(LMNotifyRebuild), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
   }
 }

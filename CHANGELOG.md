@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.1
+- New: "Rebuild icons" in Settings deletes the icon cache of iOS and respring
+
 ## 1.1.0
 - New: pick your own icon for any app right in LumenBoard (photo button at the top left). Choose the app, then an image from Photos (with crop) or Files. No Filza needed
 - Custom icons win over every theme and can be changed or removed at any time
