@@ -3,6 +3,7 @@
 #import "LMAppDelegate.h"
 #import "../Shared/LMThemeLibrary.h"
 #import <ImageIO/ImageIO.h>
+#import <QuartzCore/QuartzCore.h>
 #include <sys/stat.h>
 
 static const CGFloat LMCustomIconPixels = 1024;
@@ -71,12 +72,35 @@ static UIImage *LMSquareIcon(UIImage *image) {
 }
 
 + (UIImage *)thumbnailForBundleID:(NSString *)bundleID pixels:(CGFloat)pixels {
+  return [self thumbnailForPath:[self pathForBundleID:bundleID] pixels:pixels];
+}
+
++ (UIImage *)squircleImage:(UIImage *)image {
+  CGFloat side = MAX(image.size.width, image.size.height);
+  if (side <= 0) return image;
+  // a layer with continuous corners is what iOS uses for its icons, a plain rounded rect is a bit different
+  CALayer *layer = [CALayer layer];
+  layer.frame = CGRectMake(0, 0, image.size.width, image.size.height);
+  layer.contents = (__bridge id)image.CGImage;
+  layer.contentsGravity = kCAGravityResizeAspectFill;
+  layer.cornerRadius = MIN(image.size.width, image.size.height) * 0.2237;
+  layer.cornerCurve = kCACornerCurveContinuous;
+  layer.masksToBounds = YES;
+  UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat preferredFormat];
+  format.scale = image.scale;
+  UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:image.size format:format];
+  return [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+    [layer renderInContext:context.CGContext];
+  }];
+}
+
++ (UIImage *)thumbnailForPath:(NSString *)path pixels:(CGFloat)pixels {
   static NSCache<NSString *, UIImage *> *cache;
   static dispatch_once_t once;
   dispatch_once(&once, ^{
     cache = [NSCache new];
   });
-  NSString *path = [self pathForBundleID:bundleID];
+  if (!path.length) return nil;
   struct stat info;
   if (stat(path.fileSystemRepresentation, &info) != 0) return nil;
   // a replaced image has a new modification time

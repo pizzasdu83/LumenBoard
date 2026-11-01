@@ -3,15 +3,28 @@
 #import "LMApplyViewController.h"
 #import "LMCustomIconStore.h"
 #import "LMConfigStore.h"
+#import "../Shared/LMThemeLibrary.h"
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+
+typedef NS_ENUM(NSInteger, LMIconSection) {
+  LMIconSectionCustom,
+  LMIconSectionIOSShape,
+};
+
+// the button at the top shows every icon with the iOS shape, to see what it would look like (default: icons as they are)
+static BOOL LMPreviewShape = NO;
 
 @interface LMCustomIconsViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIDocumentPickerDelegate>
 @end
 
 @implementation LMCustomIconsViewController {
-  NSMutableArray<NSString *> *_bundleIDs; // lowercased, sorted by app name
+  NSMutableArray<NSString *> *_custom; // lowercased bundle ids with a custom icon that keeps its own shape
+  NSMutableArray<NSString *> *_shape;  // lowercased bundle ids that get the iOS shape
   NSDictionary<NSString *, LMAppInfo *> *_apps; // lowercased bundle id -> app, nil until loaded
+  NSDictionary<NSString *, NSDictionary *> *_themeIcons; // what the active themes give, for the apps without a custom icon
   NSString *_pendingBundleID; // the app an image is being picked for
+  UIBarButtonItem *_addItem;
+  UIBarButtonItem *_shapeItem;
   UIButton *_applyButton;
 }
 
@@ -23,7 +36,11 @@
   [super viewDidLoad];
   self.title = LMLocalized(@"Custom icons");
   self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
-  self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addApp)];
+  _addItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addApp)];
+  _shapeItem = [[UIBarButtonItem alloc] initWithImage:nil style:UIBarButtonItemStylePlain target:self action:@selector(toggleShape)];
+  _shapeItem.accessibilityLabel = LMLocalized(@"Preview the iOS shape");
+  [self updateShapeItem];
+  self.navigationItem.rightBarButtonItems = @[_addItem, _shapeItem];
   [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"Icon"];
   self.tableView.rowHeight = 64;
 
@@ -68,18 +85,52 @@
 }
 
 - (void)reload {
-  NSMutableArray *bundleIDs = [[LMCustomIconStore bundleIDs] mutableCopy];
-  [bundleIDs sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+  LMConfigStore *config = [LMConfigStore sharedStore];
+  NSSet *shaped = [NSSet setWithArray:config.shapeApps];
+  NSMutableArray *custom = [NSMutableArray new];
+  for (NSString *bundleID in [LMCustomIconStore bundleIDs]) if (![shaped containsObject:bundleID]) [custom addObject:bundleID];
+  NSMutableArray *shape = [config.shapeApps mutableCopy];
+  NSComparisonResult (^byName)(NSString *, NSString *) = ^NSComparisonResult(NSString *a, NSString *b) {
     return [[self nameForBundleID:a] localizedCaseInsensitiveCompare:[self nameForBundleID:b]];
-  }];
-  _bundleIDs = bundleIDs;
+  };
+  [custom sortUsingComparator:byName];
+  [shape sortUsingComparator:byName];
+  _custom = custom;
+  _shape = shape;
+  // the icons of the active themes, for the apps in the iOS shape section that have no custom icon
+  _themeIcons = _shape.count ? [LMThemeLibrary resolvedIconsForThemes:config.enabledThemes appNames:nil] : @{};
   [self.tableView reloadData];
   [self updateEmptyState];
   [self updateApplyButton];
 }
 
+- (NSMutableArray<NSString *> *)listForSection:(NSInteger)section {
+  return section == LMIconSectionCustom ? _custom : _shape;
+}
+
+- (BOOL)hasIOSShape:(NSString *)bundleID {
+  return [[LMConfigStore sharedStore].shapeApps containsObject:bundleID.lowercaseString];
+}
+
+// saves the config, shows what went wrong
+- (BOOL)saveConfig {
+  NSError *error;
+  if ([[LMConfigStore sharedStore] save:&error]) return YES;
+  [self showError:error];
+  return NO;
+}
+
+- (void)setIOSShape:(BOOL)shape forBundleID:(NSString *)bundleID {
+  NSMutableArray *apps = [[LMConfigStore sharedStore].shapeApps mutableCopy];
+  if (shape) [apps addObject:bundleID.lowercaseString];
+  else [apps removeObject:bundleID.lowercaseString];
+  [LMConfigStore sharedStore].shapeApps = apps;
+  [self saveConfig];
+  [self reload];
+}
+
 - (void)updateEmptyState {
-  if (_bundleIDs.count) {
+  if (_custom.count + _shape.count) {
     self.tableView.backgroundView = nil;
     return;
   }
@@ -116,6 +167,10 @@
   [_applyButton sizeToFit];
 }
 
+- (void)updateShapeItem {
+  _shapeItem.image = [UIImage systemImageNamed:LMPreviewShape ? @"app.fill" : @"app"];
+}
+
 - (void)showError:(NSError *)error {
   UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Couldn't save") message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
@@ -125,15 +180,22 @@
 #pragma mark - Actions
 
 - (void)apply {
-  [self presentViewController:[[LMApplyViewController alloc] initWithClearingIconCache:NO] animated:YES completion:^{
+  [self presentViewController:[LMApplyViewController new] animated:YES completion:^{
     [self updateApplyButton];
   }];
 }
 
+- (void)toggleShape {
+  LMPreviewShape = !LMPreviewShape;
+  [self updateShapeItem];
+  [self.tableView reloadData];
+}
+
 - (void)addApp {
   __weak typeof(self) weakSelf = self;
-  NSSet *customized = [NSSet setWithArray:[LMCustomIconStore bundleIDs]];
-  LMAppPickerViewController *picker = [[LMAppPickerViewController alloc] initWithCustomizedBundleIDs:customized pick:^(LMAppInfo *app) {
+  NSMutableSet *listed = [NSMutableSet setWithArray:[LMCustomIconStore bundleIDs]];
+  [listed addObjectsFromArray:[LMConfigStore sharedStore].shapeApps];
+  LMAppPickerViewController *picker = [[LMAppPickerViewController alloc] initWithCustomizedBundleIDs:listed pick:^(LMAppInfo *app) {
     [weakSelf chooseImageSourceForBundleID:app.bundleID name:app.name sourceView:nil];
   }];
   [self presentViewController:[[UINavigationController alloc] initWithRootViewController:picker] animated:YES completion:nil];
@@ -149,6 +211,10 @@
   [sheet addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Choose from Files") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
     [weakSelf pickFromFilesForBundleID:bundleID];
   }]];
+  BOOL shape = [self hasIOSShape:bundleID];
+  [sheet addAction:[UIAlertAction actionWithTitle:shape ? LMLocalized(@"Own shape") : LMLocalized(@"iOS shape") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+    [weakSelf setIOSShape:!shape forBundleID:bundleID];
+  }]];
   if ([LMCustomIconStore hasIconForBundleID:bundleID]) {
     [sheet addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Remove custom icon") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
       [weakSelf removeBundleID:bundleID];
@@ -160,7 +226,7 @@
     popover.sourceView = sourceView;
     popover.sourceRect = sourceView.bounds;
   } else {
-    popover.barButtonItem = self.navigationItem.rightBarButtonItem;
+    popover.barButtonItem = _addItem;
   }
   [self presentViewController:sheet animated:YES completion:nil];
 }
@@ -240,20 +306,27 @@
 #pragma mark - Table view
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-  return 1;
+  return 2;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-  return _bundleIDs.count;
+  return [self listForSection:section].count;
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+  if (![self listForSection:section].count) return nil;
+  return section == LMIconSectionCustom ? LMLocalized(@"Custom icons") : LMLocalized(@"iOS shape");
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-  return LMLocalized(@"A custom icon replaces the icon of that app, whatever your themes say. Tap Apply afterwards.");
+  if (![self listForSection:section].count) return nil;
+  if (section == LMIconSectionCustom) return LMLocalized(@"A custom icon replaces the icon of that app, whatever your themes say. Swipe right on an icon to give it the iOS shape. Tap Apply afterwards.");
+  return LMLocalized(@"These icons get the iOS icon shape, even if \"iOS icon shape\" is off in Settings. Swipe right to give them their own shape back.");
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
   UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Icon" forIndexPath:indexPath];
-  NSString *bundleID = _bundleIDs[indexPath.row];
+  NSString *bundleID = [self listForSection:indexPath.section][indexPath.row];
   UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
   content.text = [self nameForBundleID:bundleID];
   content.textProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
@@ -261,10 +334,17 @@
   content.secondaryText = missing ? [NSString stringWithFormat:@"%@ · %@", bundleID, LMLocalized(@"App not installed")] : bundleID;
   content.secondaryTextProperties.color = [UIColor secondaryLabelColor];
   content.secondaryTextProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
-  content.image = [LMCustomIconStore thumbnailForBundleID:bundleID pixels:144] ? : [UIImage systemImageNamed:@"photo"];
+
+  // the custom icon, else what the themes give, else the icon as it is on the home screen
+  UIImage *thumbnail = [LMCustomIconStore thumbnailForBundleID:bundleID pixels:144];
+  if (!thumbnail) thumbnail = [LMCustomIconStore thumbnailForPath:_themeIcons[bundleID][LMIconLight] pixels:144];
+  if (!thumbnail) thumbnail = [LMAppCatalog iconForBundleID:_apps[bundleID].bundleID ? : bundleID];
+  // the icons that get the iOS shape are shown with it, the others only when the preview is on
+  BOOL shaped = thumbnail && (indexPath.section == LMIconSectionIOSShape || LMPreviewShape || [LMConfigStore sharedStore].useSystemIconShape);
+  content.image = thumbnail ? (shaped ? [LMCustomIconStore squircleImage:thumbnail] : thumbnail) : [UIImage systemImageNamed:@"photo"];
   content.imageProperties.maximumSize = CGSizeMake(48, 48);
   content.imageProperties.reservedLayoutSize = CGSizeMake(48, 48);
-  content.imageProperties.cornerRadius = 10.8;
+  content.imageProperties.cornerRadius = 0;
   content.imageProperties.tintColor = [UIColor tertiaryLabelColor];
   cell.contentConfiguration = content;
   return cell;
@@ -272,13 +352,33 @@
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
   [tableView deselectRowAtIndexPath:indexPath animated:YES];
-  NSString *bundleID = _bundleIDs[indexPath.row];
+  NSString *bundleID = [self listForSection:indexPath.section][indexPath.row];
   [self chooseImageSourceForBundleID:bundleID name:[self nameForBundleID:bundleID] sourceView:[tableView cellForRowAtIndexPath:indexPath]];
 }
 
-- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
-  if (editingStyle != UITableViewCellEditingStyleDelete) return;
-  [self removeBundleID:_bundleIDs[indexPath.row]];
+// swipe right: to the iOS shape section and back
+- (UISwipeActionsConfiguration *)tableView:(UITableView *)tableView leadingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
+  NSString *bundleID = [self listForSection:indexPath.section][indexPath.row];
+  BOOL shape = indexPath.section == LMIconSectionIOSShape;
+  UIContextualAction *action = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal title:shape ? LMLocalized(@"Own shape") : LMLocalized(@"iOS shape") handler:^(UIContextualAction *contextualAction, UIView *sourceView, void (^completion)(BOOL)) {
+    [self setIOSShape:!shape forBundleID:bundleID];
+    completion(YES);
+  }];
+  action.image = [UIImage systemImageNamed:shape ? @"square" : @"app"];
+  action.backgroundColor = [UIColor systemIndigoColor];
+  return [UISwipeActionsConfiguration configurationWithActions:@[action]];
+}
+
+// swipe left: remove the custom icon
+- (UISwipeActionsConfiguration *)tableView:(UITableView *)tableView trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
+  NSString *bundleID = [self listForSection:indexPath.section][indexPath.row];
+  if (![LMCustomIconStore hasIconForBundleID:bundleID]) return nil;
+  UIContextualAction *action = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive title:LMLocalized(@"Remove") handler:^(UIContextualAction *contextualAction, UIView *sourceView, void (^completion)(BOOL)) {
+    [self removeBundleID:bundleID];
+    completion(YES);
+  }];
+  action.image = [UIImage systemImageNamed:@"trash"];
+  return [UISwipeActionsConfiguration configurationWithActions:@[action]];
 }
 
 @end

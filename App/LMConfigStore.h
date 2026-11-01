@@ -8,6 +8,10 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)sharedStore;
 // theme folder names, highest priority first
 @property (nonatomic, copy) NSArray<NSString *> *enabledThemes;
+// lowercased bundle ids whose icon gets the iOS icon shape, even if useSystemIconShape is off
+@property (nonatomic, copy) NSArray<NSString *> *shapeApps;
+// theme folder names whose icons all get the iOS icon shape
+@property (nonatomic, copy) NSArray<NSString *> *shapeThemes;
 @property (nonatomic) BOOL useSystemIconShape;
 @property (nonatomic) BOOL keepIconsInDarkAndTinted;
 // changes whenever a custom icon is added, replaced or removed, so "Apply" knows there is something to do

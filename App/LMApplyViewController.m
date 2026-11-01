@@ -73,7 +73,6 @@ static NSString *LMWipeSummary(NSDictionary *wipe) {
 }
 
 @implementation LMApplyViewController {
-  BOOL _clearIconCache;
   BOOL _rebuildOnly;
   NSString *_wipeSummary;
   BOOL _springBoardAnswered;
@@ -85,9 +84,8 @@ static NSString *LMWipeSummary(NSDictionary *wipe) {
   UIButton *_closeButton;
 }
 
-- (instancetype)initWithClearingIconCache:(BOOL)clearIconCache {
+- (instancetype)init {
   if ((self = [super initWithNibName:nil bundle:nil])) {
-    _clearIconCache = clearIconCache;
     _progressToken = NOTIFY_TOKEN_INVALID;
     self.modalPresentationStyle = UIModalPresentationPageSheet;
     self.modalInPresentation = YES;
@@ -99,7 +97,7 @@ static NSString *LMWipeSummary(NSDictionary *wipe) {
 }
 
 - (instancetype)initWithRebuildingOnly {
-  if ((self = [self initWithClearingIconCache:YES])) _rebuildOnly = YES;
+  if ((self = [self init])) _rebuildOnly = YES;
   return self;
 }
 
@@ -116,7 +114,7 @@ static NSString *LMWipeSummary(NSDictionary *wipe) {
 
   _titleLabel = [UILabel new];
   _titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
-  _titleLabel.text = _clearIconCache ? LMLocalized(@"Rebuilding icons") : LMLocalized(@"Applying theme");
+  _titleLabel.text = _rebuildOnly ? LMLocalized(@"Rebuilding icons") : LMLocalized(@"Applying theme");
 
   _progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
   _progressView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -182,7 +180,7 @@ static NSString *LMWipeSummary(NSDictionary *wipe) {
       notify_post(LMNotifyRebuild);
     });
   } else {
-    notify_post(_clearIconCache ? LMNotifyClearCache : LMNotifyApply);
+    notify_post(LMNotifyApply);
     [[LMConfigStore sharedStore] markApplied];
   }
 

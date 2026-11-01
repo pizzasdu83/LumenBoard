@@ -21,6 +21,9 @@
     _enabledThemes = [themes isKindOfClass:[NSArray class]] ? [themes copy] : @[];
     _useSystemIconShape = [config[LMConfigUseSystemIconShape] boolValue];
     _keepIconsInDarkAndTinted = [config[LMConfigKeepIconsInDarkAndTinted] boolValue];
+    NSArray *apps = config[LMConfigShapeApps], *shapeThemeList = config[LMConfigShapeThemes];
+    _shapeApps = [apps isKindOfClass:[NSArray class]] ? [apps copy] : @[];
+    _shapeThemes = [shapeThemeList isKindOfClass:[NSArray class]] ? [shapeThemeList copy] : @[];
     NSString *revision = config[LMConfigCustomIconsRevision];
     _customIconsRevision = [revision isKindOfClass:[NSString class]] ? [revision copy] : @"";
     // what SpringBoard last applied, so the app knows about pending changes even after a restart
@@ -38,8 +41,25 @@
     LMConfigEnabledThemes : _enabledThemes ? : @[],
     LMConfigUseSystemIconShape : @(_useSystemIconShape),
     LMConfigKeepIconsInDarkAndTinted : @(_keepIconsInDarkAndTinted),
-    LMConfigCustomIconsRevision : _customIconsRevision ? : @""
+    LMConfigCustomIconsRevision : _customIconsRevision ? : @"",
+    LMConfigShapeApps : _shapeApps ? : @[],
+    LMConfigShapeThemes : _shapeThemes ? : @[]
   };
+}
+
+// no duplicates, always in the same order, so the same choice is always the same config
+static NSArray<NSString *> *LMNormalizedList(NSArray<NSString *> *list, BOOL lowercase) {
+  NSMutableSet *set = [NSMutableSet new];
+  for (NSString *item in list) if ([item isKindOfClass:[NSString class]] && item.length) [set addObject:lowercase ? item.lowercaseString : item];
+  return [set.allObjects sortedArrayUsingSelector:@selector(compare:)];
+}
+
+- (void)setShapeApps:(NSArray<NSString *> *)shapeApps {
+  _shapeApps = LMNormalizedList(shapeApps, YES);
+}
+
+- (void)setShapeThemes:(NSArray<NSString *> *)shapeThemes {
+  _shapeThemes = LMNormalizedList(shapeThemes, NO);
 }
 
 - (BOOL)hasUnappliedChanges {

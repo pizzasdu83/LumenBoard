@@ -53,16 +53,6 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
   [self save];
 }
 
-- (void)confirmClearIconCache {
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Clear icon cache?") message:LMLocalized(@"All app icons are rendered again, then SpringBoard restarts. This can take a minute.") preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
-  [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Clear & Respring") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-    [self save];
-    [self presentViewController:[[LMApplyViewController alloc] initWithClearingIconCache:YES] animated:YES completion:nil];
-  }]];
-  [self presentViewController:alert animated:YES completion:nil];
-}
-
 - (void)confirmRebuildIcons {
   UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Rebuild icons?") message:LMLocalized(@"The icon cache of iOS is deleted, then SpringBoard restarts. iOS draws the icons again afterwards.") preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
@@ -81,7 +71,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
   switch (section) {
     case LMSettingsSectionIconStyle: return 2;
-    case LMSettingsSectionIconCache: return 2;
+    case LMSettingsSectionIconCache: return 1;
     case LMSettingsSectionTroubleshooting: return 1;
     case LMSettingsSectionAbout: return 2;
   }
@@ -100,8 +90,8 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   switch (section) {
-    case LMSettingsSectionIconStyle: return LMLocalized(@"Theme icons keep their own shape unless \"iOS icon shape\" is on. Tap Apply afterwards.");
-    case LMSettingsSectionIconCache: return LMLocalized(@"Clearing the icon cache renders every icon again first, which can take a minute. Rebuild icons only deletes the icon cache of iOS and respring, which is quicker. Use them if icons still look wrong after installing or updating themes.");
+    case LMSettingsSectionIconStyle: return LMLocalized(@"Theme icons keep their own shape unless \"iOS icon shape\" is on. Single icons and themes can get it with a swipe to the right in their list. Tap Apply afterwards.");
+    case LMSettingsSectionIconCache: return LMLocalized(@"Rebuild icons deletes the icon cache of iOS and respring. Use it if icons still look wrong after installing or updating themes.");
     case LMSettingsSectionTroubleshooting: return LMLocalized(@"Shows what LumenBoard did in SpringBoard and iconservicesagent. Copy the report if your icons don't change.");
   }
   return nil;
@@ -122,9 +112,9 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
     content.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
     cell.accessoryView = [self switchWithValue:config.keepIconsInDarkAndTinted action:@selector(keepAppearanceChanged:)];
   } else if (indexPath.section == LMSettingsSectionIconCache) {
-    content.text = indexPath.row == 0 ? LMLocalized(@"Clear icon cache & respring") : LMLocalized(@"Rebuild icons");
+    content.text = LMLocalized(@"Rebuild icons");
     content.textProperties.color = self.view.tintColor;
-    content.image = [UIImage systemImageNamed:indexPath.row == 0 ? @"arrow.clockwise" : @"arrow.triangle.2.circlepath"];
+    content.image = [UIImage systemImageNamed:@"arrow.triangle.2.circlepath"];
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
   } else if (indexPath.section == LMSettingsSectionTroubleshooting) {
     content.text = LMLocalized(@"Diagnostics");
@@ -147,10 +137,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
   [tableView deselectRowAtIndexPath:indexPath animated:YES];
-  if (indexPath.section == LMSettingsSectionIconCache) {
-    if (indexPath.row == 0) [self confirmClearIconCache];
-    else [self confirmRebuildIcons];
-  }
+  if (indexPath.section == LMSettingsSectionIconCache) [self confirmRebuildIcons];
   else if (indexPath.section == LMSettingsSectionTroubleshooting) [self.navigationController pushViewController:[LMDiagnosticsViewController new] animated:YES];
 }
 

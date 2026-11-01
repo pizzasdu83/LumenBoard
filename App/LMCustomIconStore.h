@@ -13,6 +13,10 @@ NS_ASSUME_NONNULL_BEGIN
 + (BOOL)setImage:(UIImage *)image forBundleID:(NSString *)bundleID error:(NSError **)error;
 + (BOOL)removeIconForBundleID:(NSString *)bundleID error:(NSError **)error;
 + (nullable UIImage *)thumbnailForBundleID:(NSString *)bundleID pixels:(CGFloat)pixels;
+// any png: decodes only what the thumbnail needs, theme icons are often 1024 px
++ (nullable UIImage *)thumbnailForPath:(NSString *)path pixels:(CGFloat)pixels;
+// the image clipped to the iOS icon shape (the continuous corners of a home screen icon)
++ (UIImage *)squircleImage:(UIImage *)image;
 
 @end
 

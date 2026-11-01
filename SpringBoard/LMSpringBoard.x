@@ -105,13 +105,15 @@ static BOOL LMWriteIconMap(void) {
   BOOL systemShape = [config[LMConfigUseSystemIconShape] boolValue];
   BOOL keepAppearance = [config[LMConfigKeepIconsInDarkAndTinted] boolValue];
   NSString *customRevision = [config[LMConfigCustomIconsRevision] isKindOfClass:[NSString class]] ? config[LMConfigCustomIconsRevision] : @"";
+  NSArray *shapeApps = [config[LMConfigShapeApps] isKindOfClass:[NSArray class]] ? config[LMConfigShapeApps] : @[];
+  NSArray *shapeThemes = [config[LMConfigShapeThemes] isKindOfClass:[NSArray class]] ? config[LMConfigShapeThemes] : @[];
 
   [LMThemeLibrary invalidate];
   BOOL usesAppNames = NO;
   for (NSString *theme in themes) usesAppNames = usesAppNames || ([theme isKindOfClass:[NSString class]] && [LMThemeLibrary iconsByAppNameInTheme:theme].count);
   NSDictionary *icons = [LMThemeLibrary resolvedIconsForThemes:themes appNames:(usesAppNames ? LMInstalledAppNames() : nil)];
 
-  NSDictionary *appliedConfig = @{ LMConfigEnabledThemes : themes, LMConfigUseSystemIconShape : @(systemShape), LMConfigKeepIconsInDarkAndTinted : @(keepAppearance), LMConfigCustomIconsRevision : customRevision };
+  NSDictionary *appliedConfig = @{ LMConfigEnabledThemes : themes, LMConfigUseSystemIconShape : @(systemShape), LMConfigKeepIconsInDarkAndTinted : @(keepAppearance), LMConfigCustomIconsRevision : customRevision, LMConfigShapeApps : shapeApps, LMConfigShapeThemes : shapeThemes };
 
   // hash everything that changes how an icon looks. Paths are saved as jailbreak paths (roothide renames the jbroot).
   NSString *style = [NSString stringWithFormat:@"v%d shape=%d keep=%d", LMMapVersion, systemShape, keepAppearance];
@@ -125,7 +127,10 @@ static BOOL LMWriteIconMap(void) {
       if (icon[slot]) entry[slot] = LMJailbreakPath(icon[slot]);
       [material appendFormat:@"|%@@%@", entry[slot] ? : @"", LMFileStamp(icon[slot])];
     }
-    [material appendFormat:@"|%@", style];
+    // the iOS shape for this app, or for the theme the icon comes from
+    BOOL shape = [shapeApps containsObject:bundleID] || (icon[LMIconTheme] && [shapeThemes containsObject:icon[LMIconTheme]]);
+    if (shape) entry[LMIconShape] = @YES;
+    [material appendFormat:@"|%@|%@", shape ? @"shape" : @"", style];
     entries[bundleID] = entry;
     materials[bundleID] = material;
     [content appendFormat:@"%@\n", material];
@@ -173,14 +178,6 @@ static void LMReportProgress(uint32_t done, uint32_t total) {
   if (!registered) return;
   notify_set_state(token, ((uint64_t)done << 32) | total);
   notify_post(LMNotifyProgress);
-}
-
-static void LMClearSystemIconCache(void) {
-  for (NSString *path in @[
-    @"/var/containers/Shared/SystemGroup/systemgroup.com.apple.lsd.iconscache/Library/Caches/com.apple.IconsCache",
-    @"/var/mobile/Library/Caches/com.apple.IconsCache",
-    @"/var/mobile/Library/Caches/MappedImageCache/Persistent"
-  ]) [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
 }
 
 // the descriptors SpringBoard uses for home screen icons, main thread only
@@ -278,13 +275,12 @@ static void LMSaveApplyStatus(NSDictionary *status) {
   [data writeToFile:LMStatusPath(@"Apply") options:NSDataWritingAtomic error:nil];
 }
 
-static void LMApply(BOOL clearCache) {
+static void LMApply(void) {
   static BOOL applying;
   if (applying) return;
   applying = YES;
 
   NSDictionary *before = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath][LMMapIcons] ? : @{};
-  if (clearCache) LMClearSystemIconCache();
   BOOL mapChanged = LMWriteIconMap();
   // reload here now, the other processes get the notification
   LMReloadStoreInThisProcess();
@@ -292,7 +288,6 @@ static void LMApply(BOOL clearCache) {
   NSArray *descriptors = LMHomeScreenDescriptors();
   NSMutableDictionary *status = [@{
     @"Date" : [NSDate date],
-    @"ClearCache" : @(clearCache),
     @"MapChanged" : @(mapChanged),
     @"Descriptors" : @(descriptors.count),
   } mutableCopy];
@@ -302,7 +297,7 @@ static void LMApply(BOOL clearCache) {
     usleep(300 * 1000);
     NSDictionary *after = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath][LMMapIcons] ? : @{};
     // cache was wiped, render everything
-    NSArray *apps = clearCache ? LMAppsToRender(nil, nil) : LMAppsToRender(before, after);
+    NSArray *apps = LMAppsToRender(before, after);
     status[@"MapIcons"] = @(after.count);
     status[@"AppsToRender"] = @(apps.count);
     status[@"Prerendered"] = @(LMPrerenderIcons(apps, descriptors));
@@ -346,8 +341,7 @@ static void LMRebuildNotification(CFNotificationCenterRef center, void *observer
 }
 
 static void LMApplyNotification(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
-  BOOL clearCache = CFEqual(name, CFSTR(LMNotifyClearCache));
-  dispatch_async(dispatch_get_main_queue(), ^{ LMApply(clearCache); });
+  dispatch_async(dispatch_get_main_queue(), ^{ LMApply(); });
 }
 
 %ctor {
@@ -361,7 +355,6 @@ static void LMApplyNotification(CFNotificationCenterRef center, void *observer, 
     }
     CFNotificationCenterRef center = CFNotificationCenterGetDarwinNotifyCenter();
     CFNotificationCenterAddObserver(center, NULL, LMApplyNotification, CFSTR(LMNotifyApply), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
-    CFNotificationCenterAddObserver(center, NULL, LMApplyNotification, CFSTR(LMNotifyClearCache), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
     CFNotificationCenterAddObserver(center, NULL, LMRebuildNotification, CFSTR(LMNotifyRebuild), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
   }
 }

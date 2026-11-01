@@ -153,11 +153,12 @@ static NSString *LMDiagnosticsReport(void) {
     NSString *state = ![installed containsObject:theme] ? @" (not installed)" : (error ? [NSString stringWithFormat:@" (%@)", error] : @"");
     [report appendFormat:@"  %@%@: %lu by bundle id, %lu by app name%@\n", [config.enabledThemes containsObject:theme] ? @"* " : @"", theme, (unsigned long)byBundleID, (unsigned long)byName, state];
     if (byBundleID + byName || ![installed containsObject:theme]) continue;
-    NSString *directory = [LMThemesDirectory stringByAppendingPathComponent:theme];
+    NSString *directory = [LMThemeLibrary directoryForTheme:theme];
     [report appendFormat:@"      theme: %@\n", LMFolderSummary(directory)];
     for (NSString *folder in @[@"IconBundles", @"Icons"]) [report appendFormat:@"      %@: %@\n", folder, LMFolderSummary([directory stringByAppendingPathComponent:folder])];
   }
   [report appendFormat:@"  iOS icon shape: %@, keep in dark & tinted: %@\n", LMYesNo(config.useSystemIconShape), LMYesNo(config.keepIconsInDarkAndTinted)];
+  [report appendFormat:@"  iOS shape for single icons: %lu apps, %lu themes\n", (unsigned long)config.shapeApps.count, (unsigned long)config.shapeThemes.count];
 
   // icon map
   struct stat info;
@@ -173,7 +174,7 @@ static NSString *LMDiagnosticsReport(void) {
   // last apply
   [report appendString:@"\nLast apply\n"];
   if (apply) {
-    [report appendFormat:@"  %@, clear cache %@, map changed %@, %@ icons in map\n", LMDateString(apply[@"Date"]), LMYesNo([apply[@"ClearCache"] boolValue]), LMYesNo([apply[@"MapChanged"] boolValue]), apply[@"MapIcons"] ? : @"-"];
+    [report appendFormat:@"  %@, map changed %@, %@ icons in map\n", LMDateString(apply[@"Date"]), LMYesNo([apply[@"MapChanged"] boolValue]), apply[@"MapIcons"] ? : @"-"];
     [report appendFormat:@"  pre-rendered %@ of %@ apps (%@ sizes), respring: %@\n", apply[@"Prerendered"] ? : @"-", apply[@"AppsToRender"] ? : @"-", apply[@"Descriptors"] ? : @"-", apply[@"Respring"] ? : @"-"];
   } else {
     [report appendString:@"  none\n"];

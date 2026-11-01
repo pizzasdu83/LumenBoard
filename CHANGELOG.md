@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+- New: import themes from a zip (button at the top right of the themes list). Imported themes can be deleted with a swipe to the left
+- New: the iOS icon shape (squircle) for single icons and single themes. Swipe right on an icon (Custom icons screen, section "iOS shape") or on an active theme, even when "iOS icon shape" is off in Settings
+- New: a button at the top of the Custom icons screen previews every icon with the iOS shape
+- Removed: "Clear icon cache & respring", "Rebuild icons" does the job
+- Imported themes are found next to the themes of the package manager
+
 ## 1.1.4
 - "Rebuild icons" can now really delete the icon cache: the folder belongs to a system user, so a small root LaunchDaemon (LumenBoardHelper, like the one of Filza) deletes what is inside it
 

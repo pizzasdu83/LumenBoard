@@ -2,9 +2,11 @@
 #import "LMSettingsViewController.h"
 #import "LMApplyViewController.h"
 #import "LMCustomIconsViewController.h"
+#import "LMZipImporter.h"
 #import "LMConfigStore.h"
 #import "../Shared/LMThemeLibrary.h"
 #import <ImageIO/ImageIO.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <sys/stat.h>
 
 typedef NS_ENUM(NSInteger, LMThemeSection) {
@@ -37,7 +39,7 @@ static UIImage *LMThumbnail(NSString *path, CGFloat pixels) {
 
 // changes when the theme is reinstalled or icons are added or removed
 static NSString *LMThemeStamp(NSString *theme) {
-  NSString *directory = [LMThemesDirectory stringByAppendingPathComponent:theme];
+  NSString *directory = [LMThemeLibrary directoryForTheme:theme];
   NSMutableString *stamp = [NSMutableString new];
   for (NSString *folder in @[@"", @"IconBundles", @"Icons"]) {
     struct stat info;
@@ -70,6 +72,9 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   }];
 }
 
+@interface LMThemesViewController () <UIDocumentPickerDelegate>
+@end
+
 @implementation LMThemesViewController {
   NSMutableArray<NSString *> *_active;
   NSMutableArray<NSString *> *_installed;
@@ -79,6 +84,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   dispatch_queue_t _detailsQueue;
   NSTimer *_changeTimer;
   UIButton *_applyButton;
+  UIActivityIndicatorView *_importSpinner;
 }
 
 - (instancetype)init {
@@ -100,7 +106,9 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   UIBarButtonItem *customIconsItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"photo.on.rectangle"] style:UIBarButtonItemStylePlain target:self action:@selector(showCustomIcons)];
   customIconsItem.accessibilityLabel = LMLocalized(@"Custom icons");
   self.navigationItem.leftBarButtonItems = @[settingsItem, customIconsItem];
-  self.navigationItem.rightBarButtonItem = self.editButtonItem;
+  UIBarButtonItem *importItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"square.and.arrow.down"] style:UIBarButtonItemStylePlain target:self action:@selector(importThemes)];
+  importItem.accessibilityLabel = LMLocalized(@"Import themes");
+  self.navigationItem.rightBarButtonItems = @[self.editButtonItem, importItem];
 
   __weak typeof(self) weakSelf = self;
   UIButtonConfiguration *configuration = [UIButtonConfiguration filledButtonConfiguration];
@@ -258,7 +266,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   title.text = LMLocalized(@"No themes installed");
   title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleTitle3];
   UILabel *detail = [UILabel new];
-  detail.text = [NSString stringWithFormat:LMLocalized(@"Install themes from your package manager. They are stored in %@."), LMThemesDirectoryDisplayName];
+  detail.text = [NSString stringWithFormat:LMLocalized(@"Install themes from your package manager (they are stored in %@) or import a zip with the button at the top."), LMThemesDirectoryDisplayName];
   detail.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
   detail.textColor = [UIColor secondaryLabelColor];
   detail.numberOfLines = 0;
@@ -302,9 +310,84 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 
 - (void)apply {
   if (![self saveActiveThemes]) return;
-  [self presentViewController:[[LMApplyViewController alloc] initWithClearingIconCache:NO] animated:YES completion:^{
+  [self presentViewController:[LMApplyViewController new] animated:YES completion:^{
     [self updateApplyButton];
   }];
+}
+
+- (void)importThemes {
+  UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeZIP] asCopy:YES];
+  picker.allowsMultipleSelection = YES;
+  picker.delegate = self;
+  [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+  UIView *view = self.navigationController.view;
+  if (!_importSpinner) {
+    _importSpinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
+    _importSpinner.translatesAutoresizingMaskIntoConstraints = NO;
+  }
+  [view addSubview:_importSpinner];
+  [NSLayoutConstraint activateConstraints:@[[_importSpinner.centerXAnchor constraintEqualToAnchor:view.centerXAnchor], [_importSpinner.centerYAnchor constraintEqualToAnchor:view.centerYAnchor]]];
+  [_importSpinner startAnimating];
+  view.userInteractionEnabled = NO;
+
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    NSMutableArray<NSString *> *imported = [NSMutableArray new];
+    NSError *failure;
+    for (NSURL *url in urls) {
+      BOOL scoped = [url startAccessingSecurityScopedResource];
+      NSError *error;
+      NSArray *names = [LMZipImporter importThemesFromZipAtPath:url.path error:&error];
+      if (scoped) [url stopAccessingSecurityScopedResource];
+      if (names) [imported addObjectsFromArray:names];
+      else if (!failure) failure = error;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [self->_importSpinner stopAnimating];
+      [self->_importSpinner removeFromSuperview];
+      view.userInteractionEnabled = YES;
+      [self reloadThemes];
+      NSMutableArray *lines = [NSMutableArray new];
+      for (NSString *name in imported) [lines addObject:[LMThemeLibrary displayNameForTheme:name]];
+      if (failure) [lines addObject:failure.localizedDescription];
+      UIAlertController *alert = [UIAlertController alertControllerWithTitle:imported.count ? LMLocalized(@"Themes imported") : LMLocalized(@"Couldn't import") message:[lines componentsJoinedByString:@"\n"] preferredStyle:UIAlertControllerStyleAlert];
+      [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
+      [self presentViewController:alert animated:YES completion:nil];
+    });
+  });
+}
+
+- (void)setIOSShape:(BOOL)shape forTheme:(NSString *)theme {
+  NSMutableArray *themes = [[LMConfigStore sharedStore].shapeThemes mutableCopy];
+  if (shape) [themes addObject:theme];
+  else [themes removeObject:theme];
+  [LMConfigStore sharedStore].shapeThemes = themes;
+  [self saveActiveThemes];
+  [self.tableView reloadData];
+}
+
+- (void)confirmDeleteTheme:(NSString *)theme {
+  NSString *name = [LMThemeLibrary displayNameForTheme:theme];
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Delete theme?") message:[NSString stringWithFormat:LMLocalized(@"%@ is deleted from LumenBoard. You can import it again later."), name] preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
+  [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Delete") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+    NSError *error;
+    if (![[NSFileManager defaultManager] removeItemAtPath:[LMThemeLibrary directoryForTheme:theme] error:&error]) {
+      UIAlertController *failed = [UIAlertController alertControllerWithTitle:LMLocalized(@"Couldn't delete") message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+      [failed addAction:[UIAlertAction actionWithTitle:LMLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
+      [self presentViewController:failed animated:YES completion:nil];
+      return;
+    }
+    [LMThemeLibrary invalidateTheme:theme];
+    NSMutableArray *shapeThemes = [[LMConfigStore sharedStore].shapeThemes mutableCopy];
+    [shapeThemes removeObject:theme];
+    [LMConfigStore sharedStore].shapeThemes = shapeThemes;
+    [self reloadThemes]; // it is not installed anymore, so it drops out of the active themes and the config is saved
+    [self saveActiveThemes];
+  }]];
+  [self presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - Table view
@@ -323,7 +406,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   if (section == LMThemeSectionActive)
-    return _active.count ? LMLocalized(@"When several themes have an icon for the same app, the one higher up wins. Tap Edit to change the order.") : LMLocalized(@"Tap a theme below to activate it.");
+    return _active.count ? [NSString stringWithFormat:@"%@ %@", LMLocalized(@"When several themes have an icon for the same app, the one higher up wins. Tap Edit to change the order."), LMLocalized(@"Swipe right on an active theme to give all its icons the iOS shape.")] : LMLocalized(@"Tap a theme below to activate it.");
   return _installed.count ? nil : LMLocalized(@"All installed themes are active.");
 }
 
@@ -338,6 +421,8 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   if (details[@"Error"]) content.secondaryText = LMLocalized(@"Couldn't read this theme, pull down to try again");
   else if (details) content.secondaryText = [NSString localizedStringWithFormat:LMLocalized(@"%lu icons"), (unsigned long)[details[@"Count"] unsignedIntegerValue]];
   else content.secondaryText = LMLocalized(@"Loading…");
+  if (theme && [[LMConfigStore sharedStore].shapeThemes containsObject:theme] && !details[@"Error"])
+    content.secondaryText = [NSString stringWithFormat:@"%@ · %@", content.secondaryText, LMLocalized(@"iOS shape")];
   content.secondaryTextProperties.color = [UIColor secondaryLabelColor];
   content.image = details[@"Preview"] ? : [UIImage systemImageNamed:@"square.grid.2x2"];
   content.imageProperties.maximumSize = CGSizeMake(44, 44);
@@ -377,6 +462,32 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
     [tableView reloadSections:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, 2)] withRowAnimation:UITableViewRowAnimationNone];
   }];
   [self saveActiveThemes];
+}
+
+// swipe right: give the icons of an active theme the iOS shape
+- (UISwipeActionsConfiguration *)tableView:(UITableView *)tableView leadingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
+  NSString *theme = [self themeAtIndexPath:indexPath];
+  if (!theme || indexPath.section != LMThemeSectionActive) return nil;
+  BOOL shape = [[LMConfigStore sharedStore].shapeThemes containsObject:theme];
+  UIContextualAction *action = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal title:shape ? LMLocalized(@"Own shape") : LMLocalized(@"iOS shape") handler:^(UIContextualAction *contextualAction, UIView *sourceView, void (^completion)(BOOL)) {
+    [self setIOSShape:!shape forTheme:theme];
+    completion(YES);
+  }];
+  action.image = [UIImage systemImageNamed:shape ? @"square" : @"app"];
+  action.backgroundColor = [UIColor systemIndigoColor];
+  return [UISwipeActionsConfiguration configurationWithActions:@[action]];
+}
+
+// swipe left: delete a theme that was imported in the app, the others belong to the package manager
+- (UISwipeActionsConfiguration *)tableView:(UITableView *)tableView trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
+  NSString *theme = [self themeAtIndexPath:indexPath];
+  if (!theme || ![LMThemeLibrary isImportedTheme:theme]) return nil;
+  UIContextualAction *action = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive title:LMLocalized(@"Delete") handler:^(UIContextualAction *contextualAction, UIView *sourceView, void (^completion)(BOOL)) {
+    [self confirmDeleteTheme:theme];
+    completion(NO);
+  }];
+  action.image = [UIImage systemImageNamed:@"trash"];
+  return [UISwipeActionsConfiguration configurationWithActions:@[action]];
 }
 
 - (BOOL)tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath {

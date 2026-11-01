@@ -45,9 +45,10 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 #define LMIconMapPath [LMDataDirectory stringByAppendingPathComponent:@"IconMap.plist"]
 // icons picked in the app: CustomIcons/<lowercased bundle id>.png. They win over every theme.
 #define LMCustomIconsDirectory [LMDataDirectory stringByAppendingPathComponent:@"CustomIcons"]
+// themes imported from a zip in the app, same layout as /Library/Themes (that folder belongs to root, the app can't write there)
+#define LMImportedThemesDirectory [LMDataDirectory stringByAppendingPathComponent:@"ImportedThemes"]
 
 #define LMNotifyApply "com.xsxs18.lumenboard/apply"
-#define LMNotifyClearCache "com.xsxs18.lumenboard/clear-cache"
 #define LMNotifyRebuild "com.xsxs18.lumenboard/rebuild" // wipes the icon cache of iOS and resprings, nothing else
 #define LMNotifyMapChanged "com.xsxs18.lumenboard/map-changed"
 // state = (done << 32) | total, done == UINT32_MAX when SpringBoard is about to respring
@@ -58,6 +59,8 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 #define LMConfigUseSystemIconShape @"UseSystemIconShape"
 #define LMConfigKeepIconsInDarkAndTinted @"KeepIconsInDarkAndTinted"
 #define LMConfigCustomIconsRevision @"CustomIconsRevision" // changes whenever a custom icon is added, replaced or removed
+#define LMConfigShapeApps @"IOSShapeApps" // lowercased bundle ids whose icon gets the iOS icon shape, even if the setting is off
+#define LMConfigShapeThemes @"IOSShapeThemes" // theme folder names whose icons all get the iOS icon shape
 
 // IconMap.plist
 #define LMMapVersion 2 // 2: icon paths are jailbreak paths
@@ -66,6 +69,8 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 #define LMIconDark @"Dark"
 #define LMIconTinted @"Tinted"
 #define LMIconToken @"Token" // changes whenever the icon or the settings change
+#define LMIconShape @"Shape" // YES: this icon gets the iOS icon shape, even if the setting is off
+#define LMIconTheme @"Theme" // only while resolving: the theme folder an icon comes from, not in the icon map
 #define LMMapAppliedConfig @"AppliedConfig"
 
 // Status-<name>.plist: what the tweak did in SpringBoard, in iconservicesagent and on the last apply. Shown on the diagnostics page.

@@ -73,16 +73,33 @@ static NSString *const LMCustomIconsCacheKey = @"\n/CustomIcons"; // can't clash
 
 + (NSArray<NSString *> *)installedThemes {
   NSMutableArray *themes = [NSMutableArray new];
-  for (NSString *folder in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:LMThemesDirectory error:nil]) {
-    if ([folder hasPrefix:@"."]) continue;
-    BOOL isDirectory = NO;
-    NSString *path = [LMThemesDirectory stringByAppendingPathComponent:folder];
-    if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] && isDirectory) [themes addObject:folder];
+  // a theme in the themes folder wins over an imported one with the same name
+  for (NSString *base in @[LMThemesDirectory, LMImportedThemesDirectory]) {
+    for (NSString *folder in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:base error:nil]) {
+      if ([folder hasPrefix:@"."] || [themes containsObject:folder]) continue;
+      BOOL isDirectory = NO;
+      NSString *path = [base stringByAppendingPathComponent:folder];
+      if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] && isDirectory) [themes addObject:folder];
+    }
   }
   [themes sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
     return [[self displayNameForTheme:a] localizedCaseInsensitiveCompare:[self displayNameForTheme:b]];
   }];
   return themes;
+}
+
++ (NSString *)directoryForTheme:(NSString *)theme {
+  for (NSString *base in @[LMThemesDirectory, LMImportedThemesDirectory]) {
+    NSString *path = [base stringByAppendingPathComponent:theme];
+    BOOL isDirectory = NO;
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] && isDirectory) return path;
+  }
+  return [LMThemesDirectory stringByAppendingPathComponent:theme];
+}
+
++ (BOOL)isImportedTheme:(NSString *)theme {
+  if (!theme.length) return NO;
+  return [[self directoryForTheme:theme] hasPrefix:LMImportedThemesDirectory];
 }
 
 + (NSString *)displayNameForTheme:(NSString *)theme {
@@ -146,7 +163,7 @@ static NSString *const LMCustomIconsCacheKey = @"\n/CustomIcons"; // can't clash
   NSString *cacheKey = [theme stringByAppendingPathComponent:folder];
   NSDictionary *cached = [self cachedIconsForKey:cacheKey];
   if (cached) return cached;
-  NSString *directory = LMThemeSubfolder([LMThemesDirectory stringByAppendingPathComponent:theme], folder);
+  NSString *directory = LMThemeSubfolder([self directoryForTheme:theme], folder);
   return [self loadIconsInDirectory:directory label:folder cacheKey:cacheKey];
 }
 
@@ -167,17 +184,24 @@ static NSString *const LMCustomIconsCacheKey = @"\n/CustomIcons"; // can't clash
   return [self iconsInFolder:@"Icons" ofTheme:theme];
 }
 
+// remembers where an icon comes from, the iOS shape can be set for a whole theme
+static NSDictionary *LMIconFromTheme(NSDictionary *icon, NSString *theme) {
+  NSMutableDictionary *copy = [icon mutableCopy];
+  copy[LMIconTheme] = theme;
+  return copy;
+}
+
 + (NSDictionary<NSString *, NSDictionary *> *)resolvedIconsForThemes:(NSArray<NSString *> *)themes appNames:(NSDictionary<NSString *, NSArray<NSString *> *> *)appNames {
   // icons picked in the app win over every theme
   NSMutableDictionary *resolved = [[self customIcons] mutableCopy];
   for (NSString *theme in themes) {
     if (![theme isKindOfClass:[NSString class]]) continue;
     [[self iconsInTheme:theme] enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSDictionary *icon, BOOL *stop) {
-      if (!resolved[bundleID]) resolved[bundleID] = icon;
+      if (!resolved[bundleID]) resolved[bundleID] = LMIconFromTheme(icon, theme);
     }];
     if (!appNames.count) continue;
     [[self iconsByAppNameInTheme:theme] enumerateKeysAndObjectsUsingBlock:^(NSString *appName, NSDictionary *icon, BOOL *stop) {
-      for (NSString *bundleID in appNames[appName]) if (!resolved[bundleID]) resolved[bundleID] = icon;
+      for (NSString *bundleID in appNames[appName]) if (!resolved[bundleID]) resolved[bundleID] = LMIconFromTheme(icon, theme);
     }];
   }
   return resolved;

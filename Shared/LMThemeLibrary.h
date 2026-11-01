@@ -24,6 +24,9 @@ NS_ASSUME_NONNULL_BEGIN
 // forget cached folder listings (after themes were installed or removed)
 + (void)invalidate;
 + (void)invalidateTheme:(NSString *)theme;
+// where a theme lives: the themes folder, or the folder of the themes imported in the app
++ (NSString *)directoryForTheme:(NSString *)theme;
++ (BOOL)isImportedTheme:(NSString *)theme;
 + (void)invalidateCustomIcons;
 
 @end

@@ -1,8 +1,9 @@
 include $(THEOS)/makefiles/common.mk
 
 APPLICATION_NAME = LumenBoard
-LumenBoard_FILES = main.m LMAppDelegate.m LMConfigStore.m LMThemesViewController.m LMSettingsViewController.m LMApplyViewController.m LMDiagnosticsViewController.m LMCustomIconsViewController.m LMAppPickerViewController.m LMAppCatalog.m LMCustomIconStore.m ../Shared/LMThemeLibrary.m
+LumenBoard_FILES = main.m LMAppDelegate.m LMConfigStore.m LMThemesViewController.m LMSettingsViewController.m LMApplyViewController.m LMDiagnosticsViewController.m LMCustomIconsViewController.m LMAppPickerViewController.m LMAppCatalog.m LMCustomIconStore.m LMZipImporter.m ../Shared/LMThemeLibrary.m
 LumenBoard_FRAMEWORKS = UIKit QuartzCore ImageIO UniformTypeIdentifiers
+LumenBoard_LIBRARIES = z
 LumenBoard_CFLAGS = -fobjc-arc -Wall -Wno-deprecated-declarations -Wno-unguarded-availability-new
 LumenBoard_CODESIGN_FLAGS = -Sentitlements.plist
 

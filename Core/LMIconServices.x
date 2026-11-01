@@ -207,8 +207,9 @@ static ISResourceProvider *LMMakeProvider(NSDictionary *entry) {
   if ([provider respondsToSelector:@selector(setResourceType:)]) [provider setResourceType:1];
   if ([provider respondsToSelector:@selector(setAllowNonDefaultAppearances:)]) [provider setAllowNonDefaultAppearances:!store.keepsIconsInDarkAndTinted];
   if ([provider respondsToSelector:@selector(setAllowAlterationsToResourceArt:)]) [provider setAllowAlterationsToResourceArt:YES];
-  // only used if the descriptor doesn't ask for a shape itself
-  if (!store.usesSystemIconShape && LMRecipeClass && [provider respondsToSelector:@selector(setSuggestedRecipe:)]) [provider setSuggestedRecipe:[LMRecipeClass new]];
+  // only used if the descriptor doesn't ask for a shape itself. The shape is for every icon, or only for the ones marked in the map
+  BOOL systemShape = store.usesSystemIconShape || [entry[LMIconShape] boolValue];
+  if (!systemShape && LMRecipeClass && [provider respondsToSelector:@selector(setSuggestedRecipe:)]) [provider setSuggestedRecipe:[LMRecipeClass new]];
   LMStatusCount(LMCounterProvidersMade);
   return provider;
 }
