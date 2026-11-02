@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.0
+- New: import icon themes from a .deb (the import button now takes zips and .deb files). A .deb can hold several themes, only the ones with an IconBundles or Icons folder are imported. Needs dpkg
+
 ## 1.2.0
 - New: import themes from a zip (button at the top right of the themes list). Imported themes can be deleted with a swipe to the left
 - New: the iOS icon shape (squircle) for single icons and single themes. Swipe right on an icon (Custom icons screen, section "iOS shape") or on an active theme, even when "iOS icon shape" is off in Settings

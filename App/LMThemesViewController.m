@@ -3,6 +3,7 @@
 #import "LMApplyViewController.h"
 #import "LMCustomIconsViewController.h"
 #import "LMZipImporter.h"
+#import "LMDebImporter.h"
 #import "LMConfigStore.h"
 #import "../Shared/LMThemeLibrary.h"
 #import <ImageIO/ImageIO.h>
@@ -266,7 +267,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   title.text = LMLocalized(@"No themes installed");
   title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleTitle3];
   UILabel *detail = [UILabel new];
-  detail.text = [NSString stringWithFormat:LMLocalized(@"Install themes from your package manager (they are stored in %@) or import a zip with the button at the top."), LMThemesDirectoryDisplayName];
+  detail.text = [NSString stringWithFormat:LMLocalized(@"Install themes from your package manager (they are stored in %@) or import a zip or a .deb with the button at the top."), LMThemesDirectoryDisplayName];
   detail.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
   detail.textColor = [UIColor secondaryLabelColor];
   detail.numberOfLines = 0;
@@ -316,7 +317,9 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 }
 
 - (void)importThemes {
-  UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeZIP] asCopy:YES];
+  // a zip, or a .deb as a package manager would install it
+  UTType *debType = [UTType typeWithFilenameExtension:@"deb" conformingToType:UTTypeData];
+  UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:debType ? @[UTTypeZIP, debType] : @[UTTypeZIP, UTTypeData] asCopy:YES];
   picker.allowsMultipleSelection = YES;
   picker.delegate = self;
   [self presentViewController:picker animated:YES completion:nil];
@@ -336,10 +339,18 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
     NSMutableArray<NSString *> *imported = [NSMutableArray new];
     NSError *failure;
+    NSUInteger skipped = 0;
     for (NSURL *url in urls) {
       BOOL scoped = [url startAccessingSecurityScopedResource];
       NSError *error;
-      NSArray *names = [LMZipImporter importThemesFromZipAtPath:url.path error:&error];
+      NSArray *names;
+      if ([url.pathExtension caseInsensitiveCompare:@"deb"] == NSOrderedSame) {
+        NSUInteger skippedInPackage = 0;
+        names = [LMDebImporter importThemesFromDebAtPath:url.path skipped:&skippedInPackage error:&error];
+        skipped += skippedInPackage;
+      } else {
+        names = [LMZipImporter importThemesFromZipAtPath:url.path error:&error];
+      }
       if (scoped) [url stopAccessingSecurityScopedResource];
       if (names) [imported addObjectsFromArray:names];
       else if (!failure) failure = error;
@@ -351,6 +362,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
       [self reloadThemes];
       NSMutableArray *lines = [NSMutableArray new];
       for (NSString *name in imported) [lines addObject:[LMThemeLibrary displayNameForTheme:name]];
+      if (skipped) [lines addObject:[NSString stringWithFormat:LMLocalized(@"%lu themes skipped: they have no IconBundles or Icons folder (sounds, status bar, dock…)."), (unsigned long)skipped]];
       if (failure) [lines addObject:failure.localizedDescription];
       UIAlertController *alert = [UIAlertController alertControllerWithTitle:imported.count ? LMLocalized(@"Themes imported") : LMLocalized(@"Couldn't import") message:[lines componentsJoinedByString:@"\n"] preferredStyle:UIAlertControllerStyleAlert];
       [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
