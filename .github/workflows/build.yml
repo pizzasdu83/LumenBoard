@@ -5,6 +5,15 @@ on:
     branches: ['**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      macos_runner:
+        required: true
+        type: choice
+        default: macos-26-intel
+        options:
+        - macos-26-intel
+        - macos-26
+        - macos-15-intel
 
 permissions:
   contents: write
