@@ -24,6 +24,9 @@
     NSArray *apps = config[LMConfigShapeApps], *shapeThemeList = config[LMConfigShapeThemes];
     _shapeApps = [apps isKindOfClass:[NSArray class]] ? [apps copy] : @[];
     _shapeThemes = [shapeThemeList isKindOfClass:[NSArray class]] ? [shapeThemeList copy] : @[];
+    NSDictionary *light = config[LMConfigBackgroundLight], *dark = config[LMConfigBackgroundDark];
+    _backgroundLight = [light isKindOfClass:[NSDictionary class]] ? [light copy] : @{};
+    _backgroundDark = [dark isKindOfClass:[NSDictionary class]] ? [dark copy] : @{};
     NSString *revision = config[LMConfigCustomIconsRevision];
     _customIconsRevision = [revision isKindOfClass:[NSString class]] ? [revision copy] : @"";
     // what SpringBoard last applied, so the app knows about pending changes even after a restart
@@ -42,6 +45,8 @@
     LMConfigUseSystemIconShape : @(_useSystemIconShape),
     LMConfigKeepIconsInDarkAndTinted : @(_keepIconsInDarkAndTinted),
     LMConfigCustomIconsRevision : _customIconsRevision ? : @"",
+    LMConfigBackgroundLight : _backgroundLight ? : @{},
+    LMConfigBackgroundDark : _backgroundDark ? : @{},
     LMConfigShapeApps : _shapeApps ? : @[],
     LMConfigShapeThemes : _shapeThemes ? : @[]
   };

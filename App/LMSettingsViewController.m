@@ -1,10 +1,12 @@
 #import "LMSettingsViewController.h"
 #import "LMApplyViewController.h"
 #import "LMDiagnosticsViewController.h"
+#import "LMBackgroundViewController.h"
 #import "LMConfigStore.h"
 
 typedef NS_ENUM(NSInteger, LMSettingsSection) {
   LMSettingsSectionIconStyle,
+  LMSettingsSectionBackground,
   LMSettingsSectionIconCache,
   LMSettingsSectionTroubleshooting,
   LMSettingsSectionAbout,
@@ -25,6 +27,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 
 - (void)viewWillAppear:(BOOL)animated {
   [super viewWillAppear:animated];
+  [self.tableView reloadData]; // the background modes may have changed
   [self.navigationController setToolbarHidden:YES animated:animated];
 }
 
@@ -71,6 +74,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
   switch (section) {
     case LMSettingsSectionIconStyle: return 2;
+    case LMSettingsSectionBackground: return 2;
     case LMSettingsSectionIconCache: return 1;
     case LMSettingsSectionTroubleshooting: return 1;
     case LMSettingsSectionAbout: return 2;
@@ -81,6 +85,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
   switch (section) {
     case LMSettingsSectionIconStyle: return LMLocalized(@"Theme icons");
+    case LMSettingsSectionBackground: return LMLocalized(@"Icon background");
     case LMSettingsSectionIconCache: return LMLocalized(@"Icon cache");
     case LMSettingsSectionTroubleshooting: return LMLocalized(@"Troubleshooting");
     case LMSettingsSectionAbout: return LMLocalized(@"About");
@@ -91,6 +96,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   switch (section) {
     case LMSettingsSectionIconStyle: return LMLocalized(@"Theme icons keep their own shape unless \"iOS icon shape\" is on. Single icons and themes can get it with a swipe to the right in their list. Tap Apply afterwards.");
+    case LMSettingsSectionBackground: return LMLocalized(@"Fills the transparent parts of theme icons. Light and dark mode each have their own background. Tap Apply afterwards.");
     case LMSettingsSectionIconCache: return LMLocalized(@"Rebuild icons deletes the icon cache of iOS and respring. Use it if icons still look wrong after installing or updating themes.");
     case LMSettingsSectionTroubleshooting: return LMLocalized(@"Shows what LumenBoard did in SpringBoard and iconservicesagent. Copy the report if your icons don't change.");
   }
@@ -111,6 +117,15 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
     content.text = LMLocalized(@"Keep in dark & tinted mode");
     content.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
     cell.accessoryView = [self switchWithValue:config.keepIconsInDarkAndTinted action:@selector(keepAppearanceChanged:)];
+  } else if (indexPath.section == LMSettingsSectionBackground) {
+    BOOL dark = indexPath.row == 1;
+    NSString *mode = (dark ? config.backgroundDark : config.backgroundLight)[@"Mode"];
+    content = [UIListContentConfiguration valueCellConfiguration];
+    content.text = dark ? LMLocalized(@"Dark mode") : LMLocalized(@"Light mode");
+    content.image = [UIImage systemImageNamed:dark ? @"moon" : @"sun.max"];
+    content.secondaryText = [mode isEqualToString:@"color"] ? LMLocalized(@"Color") : ([mode isEqualToString:@"gradient"] ? LMLocalized(@"Gradient") : ([mode isEqualToString:@"image"] ? LMLocalized(@"Image") : LMLocalized(@"None")));
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
   } else if (indexPath.section == LMSettingsSectionIconCache) {
     content.text = LMLocalized(@"Rebuild icons");
     content.textProperties.color = self.view.tintColor;
@@ -137,7 +152,8 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
   [tableView deselectRowAtIndexPath:indexPath animated:YES];
-  if (indexPath.section == LMSettingsSectionIconCache) [self confirmRebuildIcons];
+  if (indexPath.section == LMSettingsSectionBackground) [self.navigationController pushViewController:[[LMBackgroundViewController alloc] initWithDark:indexPath.row == 1] animated:YES];
+  else if (indexPath.section == LMSettingsSectionIconCache) [self confirmRebuildIcons];
   else if (indexPath.section == LMSettingsSectionTroubleshooting) [self.navigationController pushViewController:[LMDiagnosticsViewController new] animated:YES];
 }
 

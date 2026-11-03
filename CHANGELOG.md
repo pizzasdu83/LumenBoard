@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.0
+- New: an icon background in Settings. Light and dark mode each have their own: none, a color, a gradient (with an angle) or an image. It goes behind the theme icons and shows where they are transparent
+
 ## 1.3.0
 - New: import icon themes from a .deb (the import button now takes zips and .deb files). A .deb can hold several themes, only the ones with an IconBundles or Icons folder are imported. Needs dpkg
 

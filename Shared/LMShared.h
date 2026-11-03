@@ -45,6 +45,8 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 #define LMIconMapPath [LMDataDirectory stringByAppendingPathComponent:@"IconMap.plist"]
 // icons picked in the app: CustomIcons/<lowercased bundle id>.png. They win over every theme.
 #define LMCustomIconsDirectory [LMDataDirectory stringByAppendingPathComponent:@"CustomIcons"]
+// images picked as icon background in the app
+#define LMBackgroundsDirectory [LMDataDirectory stringByAppendingPathComponent:@"Backgrounds"]
 // themes imported from a zip in the app, same layout as /Library/Themes (that folder belongs to root, the app can't write there)
 #define LMImportedThemesDirectory [LMDataDirectory stringByAppendingPathComponent:@"ImportedThemes"]
 
@@ -59,6 +61,11 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 #define LMConfigUseSystemIconShape @"UseSystemIconShape"
 #define LMConfigKeepIconsInDarkAndTinted @"KeepIconsInDarkAndTinted"
 #define LMConfigCustomIconsRevision @"CustomIconsRevision" // changes whenever a custom icon is added, replaced or removed
+// what goes behind the theme icons, light and dark mode each have their own: { Mode: none | color | gradient | image,
+// Color, Color2: "#RRGGBB", Angle: degrees (0 = left to right, 90 = top to bottom), Image: file name in LMBackgroundsDirectory }
+#define LMConfigBackgroundLight @"BackgroundLight"
+#define LMConfigBackgroundDark @"BackgroundDark"
+#define LMMapBackground @"Background" // in the icon map: { Light: {...}, Dark: {...} }, Image is a jailbreak path there
 #define LMConfigShapeApps @"IOSShapeApps" // lowercased bundle ids whose icon gets the iOS icon shape, even if the setting is off
 #define LMConfigShapeThemes @"IOSShapeThemes" // theme folder names whose icons all get the iOS icon shape
 
@@ -75,6 +82,12 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 
 // Status-<name>.plist: what the tweak did in SpringBoard, in iconservicesagent and on the last apply. Shown on the diagnostics page.
 #define LMStatusPath(name) [LMDataDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"Status-%@.plist", name]]
+// one line that changes whenever the background changes how an icon looks
+static inline NSString *LMBackgroundSignature(NSDictionary *background) {
+  if (![background isKindOfClass:[NSDictionary class]]) return @"-";
+  return [NSString stringWithFormat:@"%@,%@,%@,%@,%@", background[@"Mode"] ? : @"", background[@"Color"] ? : @"", background[@"Color2"] ? : @"", background[@"Angle"] ? : @"", background[@"Image"] ? : @""];
+}
+
 // the folder where iOS keeps the rendered app icons
 #define LMSystemIconsCacheFolder @"/var/containers/Shared/SystemGroup/systemgroup.com.apple.lsd.iconscache/Library/Caches"
 

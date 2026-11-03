@@ -98,6 +98,30 @@ static NSDictionary *LMInstalledAppNames(void) {
   return names;
 }
 
+// the background of the config for the map: only what can be drawn, the image as a jailbreak path. nil: none.
+static NSDictionary *LMMapBackgroundFromConfig(id raw) {
+  if (![raw isKindOfClass:[NSDictionary class]]) return nil;
+  NSString *mode = raw[@"Mode"];
+  if (![mode isKindOfClass:[NSString class]] || ![@[@"color", @"gradient", @"image"] containsObject:mode]) return nil;
+  NSMutableDictionary *background = [@{ @"Mode" : mode } mutableCopy];
+  for (NSString *key in @[@"Color", @"Color2"]) if ([raw[key] isKindOfClass:[NSString class]]) background[key] = raw[key];
+  if ([raw[@"Angle"] isKindOfClass:[NSNumber class]]) background[@"Angle"] = raw[@"Angle"];
+  if ([mode isEqualToString:@"image"]) {
+    NSString *file = raw[@"Image"];
+    if (![file isKindOfClass:[NSString class]] || !file.length || [file containsString:@"/"]) return nil;
+    NSString *path = [LMBackgroundsDirectory stringByAppendingPathComponent:file];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:path]) return nil;
+    background[@"Image"] = LMJailbreakPath(path);
+  }
+  return background;
+}
+
+// part of the style: a new image under the same name still changes it
+static NSString *LMBackgroundStyle(NSDictionary *background) {
+  NSString *image = background[@"Image"];
+  return image ? [NSString stringWithFormat:@"%@@%@", LMBackgroundSignature(background), LMFileStamp(LMRootPath(image))] : LMBackgroundSignature(background);
+}
+
 // YES if the map changed
 static BOOL LMWriteIconMap(void) {
   NSDictionary *config = [NSDictionary dictionaryWithContentsOfFile:LMConfigPath] ? : @{};
@@ -105,6 +129,7 @@ static BOOL LMWriteIconMap(void) {
   BOOL systemShape = [config[LMConfigUseSystemIconShape] boolValue];
   BOOL keepAppearance = [config[LMConfigKeepIconsInDarkAndTinted] boolValue];
   NSString *customRevision = [config[LMConfigCustomIconsRevision] isKindOfClass:[NSString class]] ? config[LMConfigCustomIconsRevision] : @"";
+  NSDictionary *backgroundLight = LMMapBackgroundFromConfig(config[LMConfigBackgroundLight]), *backgroundDark = LMMapBackgroundFromConfig(config[LMConfigBackgroundDark]);
   NSArray *shapeApps = [config[LMConfigShapeApps] isKindOfClass:[NSArray class]] ? config[LMConfigShapeApps] : @[];
   NSArray *shapeThemes = [config[LMConfigShapeThemes] isKindOfClass:[NSArray class]] ? config[LMConfigShapeThemes] : @[];
 
@@ -113,10 +138,10 @@ static BOOL LMWriteIconMap(void) {
   for (NSString *theme in themes) usesAppNames = usesAppNames || ([theme isKindOfClass:[NSString class]] && [LMThemeLibrary iconsByAppNameInTheme:theme].count);
   NSDictionary *icons = [LMThemeLibrary resolvedIconsForThemes:themes appNames:(usesAppNames ? LMInstalledAppNames() : nil)];
 
-  NSDictionary *appliedConfig = @{ LMConfigEnabledThemes : themes, LMConfigUseSystemIconShape : @(systemShape), LMConfigKeepIconsInDarkAndTinted : @(keepAppearance), LMConfigCustomIconsRevision : customRevision, LMConfigShapeApps : shapeApps, LMConfigShapeThemes : shapeThemes };
+  NSDictionary *appliedConfig = @{ LMConfigEnabledThemes : themes, LMConfigUseSystemIconShape : @(systemShape), LMConfigKeepIconsInDarkAndTinted : @(keepAppearance), LMConfigCustomIconsRevision : customRevision, LMConfigBackgroundLight : [config[LMConfigBackgroundLight] isKindOfClass:[NSDictionary class]] ? config[LMConfigBackgroundLight] : @{}, LMConfigBackgroundDark : [config[LMConfigBackgroundDark] isKindOfClass:[NSDictionary class]] ? config[LMConfigBackgroundDark] : @{}, LMConfigShapeApps : shapeApps, LMConfigShapeThemes : shapeThemes };
 
   // hash everything that changes how an icon looks. Paths are saved as jailbreak paths (roothide renames the jbroot).
-  NSString *style = [NSString stringWithFormat:@"v%d shape=%d keep=%d", LMMapVersion, systemShape, keepAppearance];
+  NSString *style = [NSString stringWithFormat:@"v%d shape=%d keep=%d light=%@ dark=%@", LMMapVersion, systemShape, keepAppearance, LMBackgroundStyle(backgroundLight), LMBackgroundStyle(backgroundDark)];
   NSMutableDictionary *entries = [NSMutableDictionary new], *materials = [NSMutableDictionary new];
   NSMutableString *content = [NSMutableString stringWithFormat:@"%@\n%@\n%@\n", style, [themes componentsJoinedByString:@"/"], customRevision];
   for (NSString *bundleID in [icons.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
@@ -135,6 +160,9 @@ static BOOL LMWriteIconMap(void) {
     materials[bundleID] = material;
     [content appendFormat:@"%@\n", material];
   }
+  NSMutableDictionary *backgrounds = [NSMutableDictionary new];
+  if (backgroundLight) backgrounds[@"Light"] = backgroundLight;
+  if (backgroundDark) backgrounds[@"Dark"] = backgroundDark;
   NSString *contentHash = LMHash(content);
 
   NSDictionary *previous = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath];
@@ -151,6 +179,7 @@ static BOOL LMWriteIconMap(void) {
     @"Generation" : generation,
     LMConfigUseSystemIconShape : @(systemShape),
     LMConfigKeepIconsInDarkAndTinted : @(keepAppearance),
+    LMMapBackground : backgrounds,
     LMMapAppliedConfig : appliedConfig,
     LMMapIcons : entries
   };

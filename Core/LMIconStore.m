@@ -7,6 +7,7 @@
   NSDictionary *_icons;
   BOOL _usesSystemIconShape;
   BOOL _keepsIconsInDarkAndTinted;
+  NSDictionary *_backgrounds; // "Light" / "Dark" -> background, the image as a real path
   // mtime and inode of the map we loaded
   struct timespec _mapModified;
   ino_t _mapInode;
@@ -58,6 +59,15 @@ static void LMMapChanged(CFNotificationCenterRef center, void *observer, CFStrin
   _icons = icons;
   _usesSystemIconShape = valid && [map[LMConfigUseSystemIconShape] boolValue];
   _keepsIconsInDarkAndTinted = valid && [map[LMConfigKeepIconsInDarkAndTinted] boolValue];
+  NSMutableDictionary *backgrounds = [NSMutableDictionary new];
+  NSDictionary *mapBackgrounds = valid && [map[LMMapBackground] isKindOfClass:[NSDictionary class]] ? map[LMMapBackground] : nil;
+  for (NSString *key in @[@"Light", @"Dark"]) {
+    if (![mapBackgrounds[key] isKindOfClass:[NSDictionary class]]) continue;
+    NSMutableDictionary *background = [mapBackgrounds[key] mutableCopy];
+    if ([background[@"Image"] isKindOfClass:[NSString class]]) background[@"Image"] = LMRootPath(background[@"Image"]);
+    backgrounds[key] = background;
+  }
+  _backgrounds = backgrounds;
   _loaded = YES;
 }
 
@@ -114,10 +124,20 @@ static void LMMapChanged(CFNotificationCenterRef center, void *observer, CFStrin
   return value;
 }
 
+- (NSDictionary *)backgroundForAppearance:(long long)appearance {
+  if (appearance != 0 && appearance != 1) return nil;
+  [_lock lock];
+  [self loadIfNeeded];
+  NSDictionary *background = _backgrounds[appearance == 1 ? @"Dark" : @"Light"];
+  [_lock unlock];
+  return background;
+}
+
 - (void)reload {
   [_lock lock];
   _loaded = NO;
   _icons = nil;
+  _backgrounds = nil;
   [_lock unlock];
 }
 

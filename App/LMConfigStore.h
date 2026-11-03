@@ -12,6 +12,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSArray<NSString *> *shapeApps;
 // theme folder names whose icons all get the iOS icon shape
 @property (nonatomic, copy) NSArray<NSString *> *shapeThemes;
+// the background behind the theme icons in light and dark mode, see LMConfigBackgroundLight. Empty: none.
+@property (nonatomic, copy) NSDictionary *backgroundLight;
+@property (nonatomic, copy) NSDictionary *backgroundDark;
 @property (nonatomic) BOOL useSystemIconShape;
 @property (nonatomic) BOOL keepIconsInDarkAndTinted;
 // changes whenever a custom icon is added, replaced or removed, so "Apply" knows there is something to do

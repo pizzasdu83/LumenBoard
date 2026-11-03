@@ -132,9 +132,102 @@ static NSString *LMBundleIdentifierForIdentity(id identity) {
 // largest icon drawn is 83.5 pt @2x / 60 pt @3x, leave room for big App Library and widget sizes
 static const NSUInteger LMMaxArtworkPixels = 512;
 
-static id LMImageBag(NSString *path) {
+// "#RRGGBB" or "#RRGGBBAA"
+static BOOL LMParseColor(id hex, CGFloat rgba[4]) {
+  if (![hex isKindOfClass:[NSString class]]) return NO;
+  NSString *digits = [hex hasPrefix:@"#"] ? [hex substringFromIndex:1] : hex;
+  unsigned long long value = 0;
+  if ((digits.length != 6 && digits.length != 8) || ![[NSScanner scannerWithString:digits] scanHexLongLong:&value]) return NO;
+  if (digits.length == 6) value = (value << 8) | 0xFF;
+  rgba[0] = ((value >> 24) & 0xFF) / 255.0;
+  rgba[1] = ((value >> 16) & 0xFF) / 255.0;
+  rgba[2] = ((value >> 8) & 0xFF) / 255.0;
+  rgba[3] = (value & 0xFF) / 255.0;
+  return YES;
+}
+
+// the image behind the icons, decoded once (the same one goes behind every icon). The caller releases it.
+static CGImageRef LMBackgroundPicture(NSString *path) {
+  static NSCache *pictures;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    pictures = [NSCache new];
+    pictures.countLimit = 4;
+  });
+  if (![path isKindOfClass:[NSString class]] || !path.length) return NULL;
+  id cached = [pictures objectForKey:path];
+  if (cached) return CGImageRetain((__bridge CGImageRef)cached);
+  CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path isDirectory:NO], NULL);
+  if (!source) return NULL;
+  NSDictionary *options = @{
+    (__bridge id)kCGImageSourceCreateThumbnailFromImageAlways : @YES,
+    (__bridge id)kCGImageSourceCreateThumbnailWithTransform : @YES,
+    (__bridge id)kCGImageSourceThumbnailMaxPixelSize : @(LMMaxArtworkPixels),
+  };
+  CGImageRef picture = CGImageSourceGetCount(source) ? CGImageSourceCreateThumbnailAtIndex(source, 0, (__bridge CFDictionaryRef)options) : NULL;
+  CFRelease(source);
+  if (!picture) return NULL;
+  [pictures setObject:(__bridge id)picture forKey:path cost:CGImageGetBytesPerRow(picture) * CGImageGetHeight(picture)];
+  return picture;
+}
+
+// the icon drawn over a color, a gradient or a picture. Returns a new image, NULL if there is nothing to draw.
+static CGImageRef LMCreateImageOverBackground(CGImageRef icon, NSDictionary *background) {
+  size_t width = CGImageGetWidth(icon), height = CGImageGetHeight(icon);
+  if (!width || !height || ![background isKindOfClass:[NSDictionary class]]) return NULL;
+  NSString *mode = background[@"Mode"];
+  CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  CGContextRef context = CGBitmapContextCreate(NULL, width, height, 8, 0, space, kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+  if (!context) {
+    CGColorSpaceRelease(space);
+    return NULL;
+  }
+  CGRect rect = CGRectMake(0, 0, width, height);
+  CGFloat first[4], second[4];
+  BOOL drawn = NO;
+  if ([mode isEqualToString:@"color"] && LMParseColor(background[@"Color"], first)) {
+    CGContextSetRGBFillColor(context, first[0], first[1], first[2], first[3]);
+    CGContextFillRect(context, rect);
+    drawn = YES;
+  } else if ([mode isEqualToString:@"gradient"] && LMParseColor(background[@"Color"], first) && LMParseColor(background[@"Color2"], second)) {
+    CGFloat components[8] = { first[0], first[1], first[2], first[3], second[0], second[1], second[2], second[3] };
+    CGGradientRef gradient = CGGradientCreateWithColorComponents(space, components, NULL, 2);
+    if (gradient) {
+      // 0 degrees goes from left to right, 90 from top to bottom (like on screen), long enough to reach the corners
+      double angle = [background[@"Angle"] doubleValue] * M_PI / 180.0, dx = cos(angle), dy = sin(angle);
+      double half = (fabs(dx) * width + fabs(dy) * height) / 2;
+      CGPoint center = CGPointMake(width / 2.0, height / 2.0);
+      // Core Graphics counts y upwards
+      CGPoint start = CGPointMake(center.x - dx * half, center.y + dy * half), end = CGPointMake(center.x + dx * half, center.y - dy * half);
+      CGContextDrawLinearGradient(context, gradient, start, end, kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+      CGGradientRelease(gradient);
+      drawn = YES;
+    }
+  } else if ([mode isEqualToString:@"image"]) {
+    CGImageRef picture = LMBackgroundPicture(background[@"Image"]);
+    if (picture && CGImageGetWidth(picture) && CGImageGetHeight(picture)) {
+      double factor = MAX(width / (double)CGImageGetWidth(picture), height / (double)CGImageGetHeight(picture));
+      double drawnWidth = CGImageGetWidth(picture) * factor, drawnHeight = CGImageGetHeight(picture) * factor;
+      CGContextDrawImage(context, CGRectMake((width - drawnWidth) / 2, (height - drawnHeight) / 2, drawnWidth, drawnHeight), picture);
+      drawn = YES;
+    }
+    CGImageRelease(picture);
+  }
+  CGImageRef result = NULL;
+  if (drawn) {
+    CGContextDrawImage(context, rect, icon);
+    result = CGBitmapContextCreateImage(context);
+  }
+  CGContextRelease(context);
+  CGColorSpaceRelease(space);
+  return result;
+}
+
+// background: goes behind the icon (nil: the icon as it is)
+static id LMImageBag(NSString *path, NSDictionary *background) {
   if (!path.length) return nil;
-  id bag = [LMImageBags objectForKey:path];
+  NSString *key = background ? [NSString stringWithFormat:@"%@\n%@", path, LMBackgroundSignature(background)] : path;
+  id bag = [LMImageBags objectForKey:key];
   if (bag) return bag;
 
   CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path isDirectory:NO], NULL);
@@ -150,6 +243,13 @@ static id LMImageBag(NSString *path) {
   CGImageRef image = sourceWidth ? CGImageSourceCreateThumbnailAtIndex(source, 0, (__bridge CFDictionaryRef)options) : NULL;
   CFRelease(source);
   if (!image) return nil;
+  if (background) {
+    CGImageRef composed = LMCreateImageOverBackground(image, background);
+    if (composed) {
+      CGImageRelease(image);
+      image = composed;
+    }
+  }
 
   NSString *name = path.lastPathComponent.lowercaseString;
   double scale = [name containsString:@"@3x"] ? 3.0 : ([name containsString:@"@2x"] ? 2.0 : 1.0);
@@ -159,7 +259,7 @@ static id LMImageBag(NSString *path) {
   if (!artwork) return nil;
 
   bag = [[objc_getClass("IFImageBag") alloc] initWithImages:@[artwork]];
-  if (bag) [LMImageBags setObject:bag forKey:path cost:cost];
+  if (bag) [LMImageBags setObject:bag forKey:key cost:cost];
   return bag;
 }
 
@@ -168,7 +268,11 @@ static void LMProviderConfigure(ISResourceProvider *self, SEL _cmd, id descripto
   NSDictionary *entry = objc_getAssociatedObject(self, &LMIconEntryKey);
   long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
   NSString *variant = (appearance == 1) ? entry[LMIconDark] : ((appearance == 2) ? entry[LMIconTinted] : nil);
-  id bag = LMImageBag(variant);
+  // light and dark mode have their own background, tinted icons have none
+  NSDictionary *background = [[LMIconStore sharedStore] backgroundForAppearance:appearance];
+  // no dark icon, but a dark background: the normal icon goes over it
+  if (!variant && appearance == 1 && background) variant = entry[LMIconLight];
+  id bag = LMImageBag(variant, background);
   if (bag) {
     [self setIconResource:bag];
     // the theme drew this appearance itself, don't let iOS derive it again
@@ -192,7 +296,8 @@ static id LMRecipePrimaryEffect(id self, SEL _cmd, id __autoreleasing *backgroun
 }
 
 static ISResourceProvider *LMMakeProvider(NSDictionary *entry) {
-  id bag = LMImageBag(entry[LMIconLight]);
+  LMIconStore *store = [LMIconStore sharedStore];
+  id bag = LMImageBag(entry[LMIconLight], [store backgroundForAppearance:0]);
   if (!bag) {
     LMStatusCount(LMCounterUnreadableImages);
     if (LMStatusCounterValue(LMCounterUnreadableImages) <= 5) LMStatusEvent(@"can't load %@", entry[LMIconLight]);
@@ -202,7 +307,6 @@ static ISResourceProvider *LMMakeProvider(NSDictionary *entry) {
   if (!provider) return nil;
   objc_setAssociatedObject(provider, &LMIconEntryKey, entry, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
-  LMIconStore *store = [LMIconStore sharedStore];
   // 1 = app icon
   if ([provider respondsToSelector:@selector(setResourceType:)]) [provider setResourceType:1];
   if ([provider respondsToSelector:@selector(setAllowNonDefaultAppearances:)]) [provider setAllowNonDefaultAppearances:!store.keepsIconsInDarkAndTinted];
