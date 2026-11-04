@@ -269,7 +269,9 @@ static void LMProviderConfigure(ISResourceProvider *self, SEL _cmd, id descripto
   long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
   NSString *variant = (appearance == 1) ? entry[LMIconDark] : ((appearance == 2) ? entry[LMIconTinted] : nil);
   // light and dark mode have their own background, tinted icons have none
-  NSDictionary *background = [[LMIconStore sharedStore] backgroundForAppearance:appearance];
+  // the background only goes behind icons that get the iOS shape (otherwise the corners would be square)
+  BOOL shaped = [LMIconStore sharedStore].usesSystemIconShape || [entry[LMIconShape] boolValue];
+  NSDictionary *background = shaped ? [[LMIconStore sharedStore] backgroundForAppearance:appearance] : nil;
   // no dark icon, but a dark background: the normal icon goes over it
   if (!variant && appearance == 1 && background) variant = entry[LMIconLight];
   id bag = LMImageBag(variant, background);
@@ -297,7 +299,9 @@ static id LMRecipePrimaryEffect(id self, SEL _cmd, id __autoreleasing *backgroun
 
 static ISResourceProvider *LMMakeProvider(NSDictionary *entry) {
   LMIconStore *store = [LMIconStore sharedStore];
-  id bag = LMImageBag(entry[LMIconLight], [store backgroundForAppearance:0]);
+  // the iOS shape is for every icon, or only for the ones marked in the map. The background only goes behind those.
+  BOOL systemShape = store.usesSystemIconShape || [entry[LMIconShape] boolValue];
+  id bag = LMImageBag(entry[LMIconLight], systemShape ? [store backgroundForAppearance:0] : nil);
   if (!bag) {
     LMStatusCount(LMCounterUnreadableImages);
     if (LMStatusCounterValue(LMCounterUnreadableImages) <= 5) LMStatusEvent(@"can't load %@", entry[LMIconLight]);
@@ -311,8 +315,7 @@ static ISResourceProvider *LMMakeProvider(NSDictionary *entry) {
   if ([provider respondsToSelector:@selector(setResourceType:)]) [provider setResourceType:1];
   if ([provider respondsToSelector:@selector(setAllowNonDefaultAppearances:)]) [provider setAllowNonDefaultAppearances:!store.keepsIconsInDarkAndTinted];
   if ([provider respondsToSelector:@selector(setAllowAlterationsToResourceArt:)]) [provider setAllowAlterationsToResourceArt:YES];
-  // only used if the descriptor doesn't ask for a shape itself. The shape is for every icon, or only for the ones marked in the map
-  BOOL systemShape = store.usesSystemIconShape || [entry[LMIconShape] boolValue];
+  // only used if the descriptor doesn't ask for a shape itself
   if (!systemShape && LMRecipeClass && [provider respondsToSelector:@selector(setSuggestedRecipe:)]) [provider setSuggestedRecipe:[LMRecipeClass new]];
   LMStatusCount(LMCounterProvidersMade);
   return provider;
