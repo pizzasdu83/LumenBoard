@@ -46,11 +46,6 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
   [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (void)systemShapeChanged:(UISwitch *)toggle {
-  [LMConfigStore sharedStore].useSystemIconShape = toggle.on;
-  [self save];
-}
-
 - (void)keepAppearanceChanged:(UISwitch *)toggle {
   [LMConfigStore sharedStore].keepIconsInDarkAndTinted = toggle.on;
   [self save];
@@ -73,7 +68,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
   switch (section) {
-    case LMSettingsSectionIconStyle: return 2;
+    case LMSettingsSectionIconStyle: return 1;
     case LMSettingsSectionBackground: return 2;
     case LMSettingsSectionIconCache: return 1;
     case LMSettingsSectionTroubleshooting: return 1;
@@ -95,8 +90,8 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   switch (section) {
-    case LMSettingsSectionIconStyle: return LMLocalized(@"Theme icons keep their own shape unless \"iOS icon shape\" is on. Single icons and themes can get it with a swipe to the right in their list. Tap Apply afterwards.");
-    case LMSettingsSectionBackground: return LMLocalized(@"Fills the transparent parts of theme icons. Light and dark mode each have their own background. Tap Apply afterwards.");
+    case LMSettingsSectionIconStyle: return LMLocalized(@"Keep in dark & tinted mode stops iOS from changing theme icons in dark and tinted mode. To give icons the iOS shape, swipe right on an icon or a theme in their list. Tap Apply afterwards.");
+    case LMSettingsSectionBackground: return LMLocalized(@"Fills the transparent parts of icons that have the iOS shape. Light and dark mode each have their own background. Tap Apply afterwards.");
     case LMSettingsSectionIconCache: return LMLocalized(@"Rebuild icons deletes the icon cache of iOS and respring. Use it if icons still look wrong after installing or updating themes.");
     case LMSettingsSectionTroubleshooting: return LMLocalized(@"Shows what LumenBoard did in SpringBoard and iconservicesagent. Copy the report if your icons don't change.");
   }
@@ -109,11 +104,7 @@ typedef NS_ENUM(NSInteger, LMSettingsSection) {
   LMConfigStore *config = [LMConfigStore sharedStore];
   cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
-  if (indexPath.section == LMSettingsSectionIconStyle && indexPath.row == 0) {
-    content.text = LMLocalized(@"iOS icon shape");
-    content.image = [UIImage systemImageNamed:@"app"];
-    cell.accessoryView = [self switchWithValue:config.useSystemIconShape action:@selector(systemShapeChanged:)];
-  } else if (indexPath.section == LMSettingsSectionIconStyle) {
+  if (indexPath.section == LMSettingsSectionIconStyle) {
     content.text = LMLocalized(@"Keep in dark & tinted mode");
     content.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
     cell.accessoryView = [self switchWithValue:config.keepIconsInDarkAndTinted action:@selector(keepAppearanceChanged:)];

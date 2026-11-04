@@ -14,6 +14,8 @@
   return store;
 }
 
+static NSArray<NSString *> *LMNormalizedList(NSArray<NSString *> *list, BOOL lowercase);
+
 - (instancetype)init {
   if ((self = [super init])) {
     NSDictionary *config = [NSDictionary dictionaryWithContentsOfFile:LMConfigPath] ? : @{};
@@ -29,12 +31,25 @@
     _backgroundDark = [dark isKindOfClass:[NSDictionary class]] ? [dark copy] : @{};
     NSString *revision = config[LMConfigCustomIconsRevision];
     _customIconsRevision = [revision isKindOfClass:[NSString class]] ? [revision copy] : @"";
+    // The switch for every icon is gone, icons and themes get the iOS shape one by one. If it was on, the icons that had the
+    // shape keep it: the active themes and the custom icons.
+    BOOL migrated = _useSystemIconShape;
+    if (migrated) {
+      _shapeThemes = LMNormalizedList([_shapeThemes arrayByAddingObjectsFromArray:_enabledThemes], NO);
+      NSMutableArray *shapeApps = [_shapeApps mutableCopy];
+      for (NSString *file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:LMCustomIconsDirectory error:nil]) {
+        if ([file.pathExtension.lowercaseString isEqualToString:@"png"] && ![file hasPrefix:@"."]) [shapeApps addObject:file.stringByDeletingPathExtension];
+      }
+      _shapeApps = LMNormalizedList(shapeApps, YES);
+      _useSystemIconShape = NO;
+    }
     // what SpringBoard last applied, so the app knows about pending changes even after a restart
     NSDictionary *applied = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath][LMMapAppliedConfig];
     NSMutableDictionary *appliedConfig = [[self dictionaryRepresentation] mutableCopy];
     // maps from older versions don't know every key, those keep the current value
     if ([applied isKindOfClass:[NSDictionary class]]) [appliedConfig addEntriesFromDictionary:applied];
     _appliedConfig = appliedConfig;
+    if (migrated) [self save:nil];
   }
   return self;
 }

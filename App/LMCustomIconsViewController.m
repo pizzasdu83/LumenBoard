@@ -321,7 +321,7 @@ static BOOL LMPreviewShape = NO;
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   if (![self listForSection:section].count) return nil;
   if (section == LMIconSectionCustom) return LMLocalized(@"A custom icon replaces the icon of that app, whatever your themes say. Swipe right on an icon to give it the iOS shape. Tap Apply afterwards.");
-  return LMLocalized(@"These icons get the iOS icon shape, even if \"iOS icon shape\" is off in Settings. Swipe right to give them their own shape back.");
+  return LMLocalized(@"These icons get the iOS icon shape. Swipe right to give them their own shape back.");
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -340,7 +340,7 @@ static BOOL LMPreviewShape = NO;
   if (!thumbnail) thumbnail = [LMCustomIconStore thumbnailForPath:_themeIcons[bundleID][LMIconLight] pixels:144];
   if (!thumbnail) thumbnail = [LMAppCatalog iconForBundleID:_apps[bundleID].bundleID ? : bundleID];
   // the icons that get the iOS shape are shown with it, the others only when the preview is on
-  BOOL shaped = thumbnail && (indexPath.section == LMIconSectionIOSShape || LMPreviewShape || [LMConfigStore sharedStore].useSystemIconShape);
+  BOOL shaped = thumbnail && (indexPath.section == LMIconSectionIOSShape || LMPreviewShape);
   content.image = thumbnail ? (shaped ? [LMCustomIconStore squircleImage:thumbnail] : thumbnail) : [UIImage systemImageNamed:@"photo"];
   content.imageProperties.maximumSize = CGSizeMake(48, 48);
   content.imageProperties.reservedLayoutSize = CGSizeMake(48, 48);
