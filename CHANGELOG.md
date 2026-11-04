@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.1
+- The icon background only goes behind icons that have the iOS shape
+- The "iOS icon shape" switch in Settings is gone: icons and themes get the shape one by one (swipe right). If the switch was on, the active themes and the custom icons keep the shape
+- Fixed: the color pickers of the icon background were drawn at the wrong place
+
 ## 1.4.0
 - New: an icon background in Settings. Light and dark mode each have their own: none, a color, a gradient (with an angle) or an image. It goes behind the theme icons and shows where they are transparent
 
