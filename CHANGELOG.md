@@ -1,8 +1,14 @@
 # Changelog
 
+## 1.5.0
+- Merged with the original LumenBoard 1.1.0: icon shapes (circle, rounded square, square, teardrop, theme mask), icon effects (Anemone underlays and overlays), Simplified Chinese, the fix for the crash with "On/Off Labels"
+- The iOS shape for single icons and themes (swipe right) counts when the icon shape in Settings is "Theme's own shape"
+- The icon background only goes behind icons that have the iOS shape (every icon with the shape "iOS shape", or the ones marked for it)
+- Themes imported from a zip or a .deb bring their effects (AnemoneEffects) and icon mask along
+- Removed for good: "Clear icon cache & respring" ("Rebuild icons" does the job)
+
 ## 1.4.1
 - The icon background only goes behind icons that have the iOS shape
-- The "iOS icon shape" switch in Settings is gone: icons and themes get the shape one by one (swipe right). If the switch was on, the active themes and the custom icons keep the shape
 - Fixed: the color pickers of the icon background were drawn at the wrong place
 
 ## 1.4.0
@@ -27,9 +33,16 @@
 ## 1.1.1
 - New: "Rebuild icons" in Settings deletes the icon cache of iOS and respring
 
-## 1.1.0
+## 1.0.4
 - New: pick your own icon for any app right in LumenBoard (photo button at the top left). Choose the app, then an image from Photos (with crop) or Files. No Filza needed
 - Custom icons win over every theme and can be changed or removed at any time
+
+## Original 1.1.0
+- Icon shapes: circle, rounded square, square, teardrop, or the icon mask of your theme. They change every app icon, also apps your themes have no icon for (Settings → Icon shape)
+- Icon effects: underlays and overlays from themes that have them (Anemone effects in `AnemoneEffects`), drawn into every app icon
+- Fixed the app crashing when opening the settings with "On/Off Labels" turned on in the accessibility settings (#4)
+- App in Simplified Chinese, thanks to @xiangfeidexiaohuo (#2)
+- New shapes and effects show up after tapping Apply
 
 ## 1.0.3
 - Fixed themes randomly showing "0 icons" and no preview, for example while your package manager is still installing themes

@@ -321,7 +321,7 @@ static BOOL LMPreviewShape = NO;
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   if (![self listForSection:section].count) return nil;
   if (section == LMIconSectionCustom) return LMLocalized(@"A custom icon replaces the icon of that app, whatever your themes say. Swipe right on an icon to give it the iOS shape. Tap Apply afterwards.");
-  return LMLocalized(@"These icons get the iOS icon shape. Swipe right to give them their own shape back.");
+  return LMLocalized(@"These icons get the iOS icon shape when the icon shape in Settings is \"Theme's own shape\". Swipe right to give them their own shape back.");
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {

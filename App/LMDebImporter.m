@@ -102,9 +102,19 @@ static void LMCollectThemes(NSString *directory, NSUInteger depth, NSMutableArra
   for (NSString *theme in [themes sortedArrayUsingSelector:@selector(compare:)]) {
     // only IconBundles and Icons are used, the rest of the theme (sounds, status bar, dock...) is left out
     NSMutableArray<NSString *> *iconFolders = [NSMutableArray new];
+    NSMutableArray<NSString *> *extraFolders = [NSMutableArray new]; // effects and the icon mask, relative to the theme
     for (NSString *child in [fileManager contentsOfDirectoryAtPath:theme error:nil]) {
       NSString *lowercase = child.lowercaseString;
-      if (([lowercase isEqualToString:@"iconbundles"] || [lowercase isEqualToString:@"icons"]) && LMIsRealFolder([theme stringByAppendingPathComponent:child])) [iconFolders addObject:child];
+      NSString *childPath = [theme stringByAppendingPathComponent:child];
+      if (!LMIsRealFolder(childPath)) continue;
+      if ([lowercase isEqualToString:@"iconbundles"] || [lowercase isEqualToString:@"icons"]) [iconFolders addObject:child];
+      else if ([lowercase isEqualToString:@"anemoneeffects"]) [extraFolders addObject:child];
+      else if ([lowercase isEqualToString:@"bundles"]) {
+        // the icon mask lives in Bundles/com.apple.mobileicons.framework, the rest of Bundles is not used
+        for (NSString *bundle in [fileManager contentsOfDirectoryAtPath:childPath error:nil]) {
+          if ([bundle.lowercaseString isEqualToString:@"com.apple.mobileicons.framework"] && LMIsRealFolder([childPath stringByAppendingPathComponent:bundle])) [extraFolders addObject:[child stringByAppendingPathComponent:bundle]];
+        }
+      }
     }
     if (!iconFolders.count) {
       skippedCount++;
@@ -142,6 +152,18 @@ static void LMCollectThemes(NSString *directory, NSUInteger depth, NSMutableArra
     if (!copied) {
       skippedCount++;
       continue;
+    }
+    // effects and icon mask: pictures only
+    for (NSString *folder in extraFolders) {
+      NSString *folderPath = [theme stringByAppendingPathComponent:folder];
+      for (NSString *relative in [fileManager enumeratorAtPath:folderPath]) {
+        if ([relative.pathExtension caseInsensitiveCompare:@"png"] != NSOrderedSame || [relative.lastPathComponent hasPrefix:@"."]) continue;
+        NSString *source = [folderPath stringByAppendingPathComponent:relative];
+        if (![[[fileManager attributesOfItemAtPath:source error:nil] fileType] isEqualToString:NSFileTypeRegular] || ++files > LMMaxFiles) continue;
+        NSString *destination = [themeOutput stringByAppendingPathComponent:[folder stringByAppendingPathComponent:relative]];
+        [fileManager createDirectoryAtPath:destination.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
+        if ([fileManager copyItemAtPath:source toPath:destination error:nil]) chmod(destination.fileSystemRepresentation, 0644);
+      }
     }
 
     // replaces an earlier import of the same theme

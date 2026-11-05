@@ -171,6 +171,18 @@ static NSString *LMThemeFolderName(NSString *base) {
       break;
     }
   }
+  // the effects and the icon mask of those themes come along
+  for (LMZipEntry *entry in entries) {
+    NSArray *components = entry.components;
+    for (NSString *root in roots.allKeys) {
+      NSUInteger depth = [rootDepths[root] unsignedIntegerValue];
+      if (components.count <= depth + 1 || ![[[components subarrayWithRange:NSMakeRange(0, depth)] componentsJoinedByString:@"/"] isEqualToString:root]) continue;
+      NSString *folder = [components[depth] lowercaseString];
+      BOOL effects = [folder isEqualToString:@"anemoneeffects"];
+      BOOL mask = [folder isEqualToString:@"bundles"] && components.count > depth + 2 && [[components[depth + 1] lowercaseString] isEqualToString:@"com.apple.mobileicons.framework"];
+      if ((effects || mask) && ![roots[root] containsObject:entry]) [roots[root] addObject:entry];
+    }
+  }
   if (!roots.count) {
     if (error) *error = LMZipError(LMLocalized(@"No theme found in this zip. A theme has an IconBundles or Icons folder."));
     return nil;

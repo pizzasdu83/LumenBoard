@@ -418,7 +418,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   if (section == LMThemeSectionActive)
-    return _active.count ? [NSString stringWithFormat:@"%@ %@", LMLocalized(@"When several themes have an icon for the same app, the one higher up wins. Tap Edit to change the order."), LMLocalized(@"Swipe right on an active theme to give all its icons the iOS shape.")] : LMLocalized(@"Tap a theme below to activate it.");
+    return _active.count ? [NSString stringWithFormat:@"%@ %@", LMLocalized(@"When several themes have an icon for the same app, the one higher up wins. Tap Edit to change the order."), LMLocalized(@"Swipe right on an active theme to give all its icons the iOS shape (with the icon shape \"Theme's own shape\").")] : LMLocalized(@"Tap a theme below to activate it.");
   return _installed.count ? nil : LMLocalized(@"All installed themes are active.");
 }
 
