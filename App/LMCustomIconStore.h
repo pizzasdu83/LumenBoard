@@ -15,6 +15,9 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable UIImage *)thumbnailForBundleID:(NSString *)bundleID pixels:(CGFloat)pixels;
 // any png: decodes only what the thumbnail needs, theme icons are often 1024 px
 + (nullable UIImage *)thumbnailForPath:(NSString *)path pixels:(CGFloat)pixels;
+// the icon over the background of the settings (a config background: Mode, Color, Color2, Angle, Image), like the home screen draws it.
+// The background is the same for every icon, nil or none: the icon as it is.
++ (UIImage *)image:(UIImage *)image overBackground:(nullable NSDictionary *)background;
 // the image clipped to the iOS icon shape (the continuous corners of a home screen icon)
 + (UIImage *)squircleImage:(UIImage *)image;
 

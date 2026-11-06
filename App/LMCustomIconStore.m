@@ -75,6 +75,55 @@ static UIImage *LMSquareIcon(UIImage *image) {
   return [self thumbnailForPath:[self pathForBundleID:bundleID] pixels:pixels];
 }
 
+static UIColor *LMStoreColorFromHex(id hex) {
+  if (![hex isKindOfClass:[NSString class]]) return nil;
+  NSString *digits = [hex hasPrefix:@"#"] ? [hex substringFromIndex:1] : hex;
+  unsigned long long value = 0;
+  if ((digits.length != 6 && digits.length != 8) || ![[NSScanner scannerWithString:digits] scanHexLongLong:&value]) return nil;
+  if (digits.length == 6) value = (value << 8) | 0xFF;
+  return [UIColor colorWithRed:((value >> 24) & 0xFF) / 255.0 green:((value >> 16) & 0xFF) / 255.0 blue:((value >> 8) & 0xFF) / 255.0 alpha:(value & 0xFF) / 255.0];
+}
+
++ (UIImage *)image:(UIImage *)image overBackground:(NSDictionary *)background {
+  NSString *mode = [background isKindOfClass:[NSDictionary class]] ? background[@"Mode"] : nil;
+  if (![mode isKindOfClass:[NSString class]] || image.size.width <= 0 || image.size.height <= 0) return image;
+  UIColor *color = LMStoreColorFromHex(background[@"Color"]), *color2 = LMStoreColorFromHex(background[@"Color2"]);
+  UIImage *picture = nil;
+  if ([mode isEqualToString:@"image"] && [background[@"Image"] isKindOfClass:[NSString class]] && ![background[@"Image"] containsString:@"/"]) {
+    picture = [UIImage imageWithContentsOfFile:[LMBackgroundsDirectory stringByAppendingPathComponent:background[@"Image"]]];
+  }
+  BOOL usable = ([mode isEqualToString:@"color"] && color) || ([mode isEqualToString:@"gradient"] && color && color2) || picture;
+  if (!usable) return image;
+
+  CGSize size = image.size;
+  UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat preferredFormat];
+  format.scale = image.scale;
+  return [[[UIGraphicsImageRenderer alloc] initWithSize:size format:format] imageWithActions:^(UIGraphicsImageRendererContext *context) {
+    CGRect rect = CGRectMake(0, 0, size.width, size.height);
+    if ([mode isEqualToString:@"color"]) {
+      [color setFill];
+      UIRectFill(rect);
+    } else if ([mode isEqualToString:@"gradient"]) {
+      CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+      CGGradientRef gradient = CGGradientCreateWithColors(space, (__bridge CFArrayRef)@[(id)color.CGColor, (id)color2.CGColor], NULL);
+      if (gradient) {
+        // like on the home screen: 0 degrees from left to right, 90 from top to bottom, long enough to reach the corners
+        double angle = [background[@"Angle"] doubleValue] * M_PI / 180.0, dx = cos(angle), dy = sin(angle);
+        double half = (fabs(dx) * size.width + fabs(dy) * size.height) / 2;
+        CGPoint center = CGPointMake(size.width / 2, size.height / 2);
+        CGContextDrawLinearGradient(context.CGContext, gradient, CGPointMake(center.x - dx * half, center.y - dy * half), CGPointMake(center.x + dx * half, center.y + dy * half), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+        CGGradientRelease(gradient);
+      }
+      CGColorSpaceRelease(space);
+    } else {
+      double factor = MAX(size.width / picture.size.width, size.height / picture.size.height);
+      CGSize drawn = CGSizeMake(picture.size.width * factor, picture.size.height * factor);
+      [picture drawInRect:CGRectMake((size.width - drawn.width) / 2, (size.height - drawn.height) / 2, drawn.width, drawn.height)];
+    }
+    [image drawInRect:rect];
+  }];
+}
+
 + (UIImage *)squircleImage:(UIImage *)image {
   CGFloat side = MAX(image.size.width, image.size.height);
   if (side <= 0) return image;

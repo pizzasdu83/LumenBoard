@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1
+- Icons have the iOS shape. The icon shape of the settings (now "Custom icon shape") is only for the icons and themes marked with a swipe to the right (section "Custom shape"), all the others keep the iOS shape
+- The icon background goes behind the icons with the iOS shape, so behind all icons except the marked ones
+- The previews in the Custom icons screen show the background (light or dark, like the current mode)
+
 ## 1.5.0
 - Merged with the original LumenBoard 1.1.0: icon shapes (circle, rounded square, square, teardrop, theme mask), icon effects (Anemone underlays and overlays), Simplified Chinese, the fix for the crash with "On/Off Labels"
 - The iOS shape for single icons and themes (swipe right) counts when the icon shape in Settings is "Theme's own shape"

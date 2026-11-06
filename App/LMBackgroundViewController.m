@@ -313,7 +313,7 @@ static NSString *LMSaveBackgroundImage(UIImage *image, BOOL dark, NSError **erro
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   if (section != LMBackgroundSectionMode) return nil;
-  return LMLocalized(@"The background only goes behind icons that have the iOS shape, and shows where the icon is transparent. Swipe right on an icon or a theme to give it that shape. Tap Apply afterwards.");
+  return LMLocalized(@"The background goes behind icons that have the iOS shape (all icons except the ones marked for the custom shape) and shows where the icon is transparent. Tap Apply afterwards.");
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {

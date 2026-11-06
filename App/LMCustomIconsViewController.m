@@ -8,18 +8,18 @@
 
 typedef NS_ENUM(NSInteger, LMIconSection) {
   LMIconSectionCustom,
-  LMIconSectionIOSShape,
+  LMIconSectionCustomShape,
 };
 
-// the button at the top shows every icon with the iOS shape, to see what it would look like (default: icons as they are)
+// The icons have the iOS shape and the background of the settings. The button at the top shows the icons marked for the custom shape the same way, to compare (default: as they are)
 static BOOL LMPreviewShape = NO;
 
 @interface LMCustomIconsViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIDocumentPickerDelegate>
 @end
 
 @implementation LMCustomIconsViewController {
-  NSMutableArray<NSString *> *_custom; // lowercased bundle ids with a custom icon that keeps its own shape
-  NSMutableArray<NSString *> *_shape;  // lowercased bundle ids that get the iOS shape
+  NSMutableArray<NSString *> *_custom; // lowercased bundle ids with a custom icon (iOS shape)
+  NSMutableArray<NSString *> *_shape;  // lowercased bundle ids marked for the custom shape
   NSDictionary<NSString *, LMAppInfo *> *_apps; // lowercased bundle id -> app, nil until loaded
   NSDictionary<NSString *, NSDictionary *> *_themeIcons; // what the active themes give, for the apps without a custom icon
   NSString *_pendingBundleID; // the app an image is being picked for
@@ -38,7 +38,7 @@ static BOOL LMPreviewShape = NO;
   self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
   _addItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addApp)];
   _shapeItem = [[UIBarButtonItem alloc] initWithImage:nil style:UIBarButtonItemStylePlain target:self action:@selector(toggleShape)];
-  _shapeItem.accessibilityLabel = LMLocalized(@"Preview the iOS shape");
+  _shapeItem.accessibilityLabel = LMLocalized(@"Preview with the iOS shape");
   [self updateShapeItem];
   self.navigationItem.rightBarButtonItems = @[_addItem, _shapeItem];
   [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"Icon"];
@@ -97,7 +97,7 @@ static BOOL LMPreviewShape = NO;
   [shape sortUsingComparator:byName];
   _custom = custom;
   _shape = shape;
-  // the icons of the active themes, for the apps in the iOS shape section that have no custom icon
+  // the icons of the active themes, for the apps in the custom shape section that have no custom icon
   _themeIcons = _shape.count ? [LMThemeLibrary resolvedIconsForThemes:config.enabledThemes appNames:nil] : @{};
   [self.tableView reloadData];
   [self updateEmptyState];
@@ -212,7 +212,7 @@ static BOOL LMPreviewShape = NO;
     [weakSelf pickFromFilesForBundleID:bundleID];
   }]];
   BOOL shape = [self hasIOSShape:bundleID];
-  [sheet addAction:[UIAlertAction actionWithTitle:shape ? LMLocalized(@"Own shape") : LMLocalized(@"iOS shape") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+  [sheet addAction:[UIAlertAction actionWithTitle:shape ? LMLocalized(@"iOS shape") : LMLocalized(@"Custom shape") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
     [weakSelf setIOSShape:!shape forBundleID:bundleID];
   }]];
   if ([LMCustomIconStore hasIconForBundleID:bundleID]) {
@@ -315,13 +315,13 @@ static BOOL LMPreviewShape = NO;
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
   if (![self listForSection:section].count) return nil;
-  return section == LMIconSectionCustom ? LMLocalized(@"Custom icons") : LMLocalized(@"iOS shape");
+  return section == LMIconSectionCustom ? LMLocalized(@"Custom icons") : LMLocalized(@"Custom shape");
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   if (![self listForSection:section].count) return nil;
-  if (section == LMIconSectionCustom) return LMLocalized(@"A custom icon replaces the icon of that app, whatever your themes say. Swipe right on an icon to give it the iOS shape. Tap Apply afterwards.");
-  return LMLocalized(@"These icons get the iOS icon shape when the icon shape in Settings is \"Theme's own shape\". Swipe right to give them their own shape back.");
+  if (section == LMIconSectionCustom) return LMLocalized(@"A custom icon replaces the icon of that app, whatever your themes say. It has the iOS shape and the background of the settings. Swipe right on an icon to give it the custom shape instead. Tap Apply afterwards.");
+  return LMLocalized(@"These icons get the custom icon shape of the settings, without the background. Swipe right to give them the iOS shape back.");
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -339,9 +339,14 @@ static BOOL LMPreviewShape = NO;
   UIImage *thumbnail = [LMCustomIconStore thumbnailForBundleID:bundleID pixels:144];
   if (!thumbnail) thumbnail = [LMCustomIconStore thumbnailForPath:_themeIcons[bundleID][LMIconLight] pixels:144];
   if (!thumbnail) thumbnail = [LMAppCatalog iconForBundleID:_apps[bundleID].bundleID ? : bundleID];
-  // the icons that get the iOS shape are shown with it, the others only when the preview is on
-  BOOL shaped = thumbnail && (indexPath.section == LMIconSectionIOSShape || LMPreviewShape);
-  content.image = thumbnail ? (shaped ? [LMCustomIconStore squircleImage:thumbnail] : thumbnail) : [UIImage systemImageNamed:@"photo"];
+  // the icons with the iOS shape are shown with it and the background of the settings (for the current light or dark mode),
+  // the ones marked for the custom shape as they are, unless the preview button is on
+  if (thumbnail && (indexPath.section == LMIconSectionCustom || LMPreviewShape)) {
+    LMConfigStore *config = [LMConfigStore sharedStore];
+    BOOL dark = self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+    thumbnail = [LMCustomIconStore squircleImage:[LMCustomIconStore image:thumbnail overBackground:dark ? config.backgroundDark : config.backgroundLight]];
+  }
+  content.image = thumbnail ? : [UIImage systemImageNamed:@"photo"];
   content.imageProperties.maximumSize = CGSizeMake(48, 48);
   content.imageProperties.reservedLayoutSize = CGSizeMake(48, 48);
   content.imageProperties.cornerRadius = 0;
@@ -356,11 +361,11 @@ static BOOL LMPreviewShape = NO;
   [self chooseImageSourceForBundleID:bundleID name:[self nameForBundleID:bundleID] sourceView:[tableView cellForRowAtIndexPath:indexPath]];
 }
 
-// swipe right: to the iOS shape section and back
+// swipe right: to the custom shape section and back
 - (UISwipeActionsConfiguration *)tableView:(UITableView *)tableView leadingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   NSString *bundleID = [self listForSection:indexPath.section][indexPath.row];
-  BOOL shape = indexPath.section == LMIconSectionIOSShape;
-  UIContextualAction *action = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal title:shape ? LMLocalized(@"Own shape") : LMLocalized(@"iOS shape") handler:^(UIContextualAction *contextualAction, UIView *sourceView, void (^completion)(BOOL)) {
+  BOOL shape = indexPath.section == LMIconSectionCustomShape;
+  UIContextualAction *action = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal title:shape ? LMLocalized(@"iOS shape") : LMLocalized(@"Custom shape") handler:^(UIContextualAction *contextualAction, UIView *sourceView, void (^completion)(BOOL)) {
     [self setIOSShape:!shape forBundleID:bundleID];
     completion(YES);
   }];
