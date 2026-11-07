@@ -70,7 +70,6 @@
 "iOS shape" = "iOS-Form";
 "Own shape" = "Eigene Form";
 "Preview the iOS shape" = "iOS-Form in der Vorschau zeigen";
-"A custom icon replaces the icon of that app, whatever your themes say. Swipe right on an icon to give it the iOS shape. Tap Apply afterwards." = "Ein eigenes Icon ersetzt das Icon dieser App, egal was deine Themes sagen. Wische bei einem Icon nach rechts, um ihm die iOS-Form zu geben. Danach auf „Anwenden“ tippen.";
 "Install themes from your package manager (they are stored in %@) or import a zip or a .deb with the button at the top." = "Installiere Themes über deinen Paketmanager (sie liegen in %@) oder importiere ein Zip oder eine .deb mit dem Button oben.";
 "dpkg-deb isn't installed. Install dpkg from your package manager." = "dpkg-deb ist nicht installiert. Installiere dpkg über deinen Paketmanager.";
 "Couldn't open this package: %@" = "Dieses Paket konnte nicht geöffnet werden: %@";
@@ -90,8 +89,6 @@
 "Choose image" = "Bild wählen";
 "Remove image" = "Bild entfernen";
 "This image can't be used." = "Dieses Bild kann nicht verwendet werden.";
-"The background only goes behind icons that have the iOS shape, and shows where the icon is transparent. Swipe right on an icon or a theme to give it that shape. Tap Apply afterwards." = "Der Hintergrund liegt nur hinter Icons mit der iOS-Form und ist sichtbar, wo das Icon transparent ist. Wische bei einem Icon oder Theme nach rechts, um ihm diese Form zu geben. Danach auf „Anwenden“ tippen.";
-"Fills the transparent parts of icons that have the iOS shape. Light and dark mode each have their own background. Tap Apply afterwards." = "Füllt die transparenten Stellen von Icons mit der iOS-Form. Heller und dunkler Modus haben je einen eigenen Hintergrund. Danach auf „Anwenden“ tippen.";
 "Icons" = "Icons";
 "Icon shape" = "Icon-Form";
 "Icon effects" = "Icon-Effekte";
@@ -102,9 +99,12 @@
 "Square" = "Quadrat";
 "Teardrop" = "Tropfen";
 "Theme mask" = "Theme-Maske";
-"\"Theme's own shape\" and \"iOS shape\" only change theme icons. The other shapes change every app icon, also apps your themes have no icon for. Tap Apply afterwards." = "„Form vom Theme“ und „iOS-Form“ ändern nur Theme-Icons. Die anderen Formen ändern jedes App-Icon, auch von Apps, für die deine Themes kein Icon haben. Tippe danach auf „Anwenden“.";
 "\"Theme mask\" uses the icon mask of your active themes." = "„Theme-Maske“ nutzt die Icon-Maske deiner aktiven Themes.";
 "None of your active themes has an icon mask, \"Theme mask\" works like \"Theme's own shape\"." = "Keins deiner aktiven Themes hat eine Icon-Maske, „Theme-Maske“ verhält sich wie „Form vom Theme“.";
-"With the shape \"Theme's own shape\", single icons and themes can get the iOS shape with a swipe to the right in their list." = "Mit der Form „Form vom Theme“ können einzelne Icons und Themes die iOS-Form mit einer Wischgeste nach rechts in ihrer Liste bekommen.";
-"These icons get the iOS icon shape when the icon shape in Settings is \"Theme's own shape\". Swipe right to give them their own shape back." = "Diese Icons bekommen die iOS-Icon-Form, wenn die Icon-Form in den Einstellungen „Form vom Theme“ ist. Nach rechts wischen, um ihnen ihre eigene Form zurückzugeben.";
-"Swipe right on an active theme to give all its icons the iOS shape (with the icon shape \"Theme's own shape\")." = "Wische bei einem aktiven Theme nach rechts, um allen seinen Icons die iOS-Form zu geben (mit der Icon-Form „Form vom Theme“).";
+"A custom icon replaces the icon of that app, whatever your themes say. Swipe right on an icon to give it the icon shape of the settings. Tap Apply afterwards." = "Ein eigenes Icon ersetzt das Icon dieser App, egal was deine Themes sagen. Wische bei einem Icon nach rechts, um ihm die Icon-Form aus den Einstellungen zu geben. Danach auf „Anwenden“ tippen.";
+"These icons get the icon shape of the settings. Swipe right to give them their own shape back." = "Diese Icons bekommen die Icon-Form aus den Einstellungen. Nach rechts wischen, um ihnen ihre eigene Form zurückzugeben.";
+"Swipe right on an active theme to give all its icons the icon shape of the settings." = "Wische bei einem aktiven Theme nach rechts, um allen seinen Icons die Icon-Form aus den Einstellungen zu geben.";
+"The icon shape is for the apps your themes have no icon for and for the icons and themes marked \"iOS shape\" (swipe right in their list). The other theme icons keep their own shape. Icon effects are the underlays and overlays some themes bring along (Anemone effects), they are drawn into every app icon. Tap Apply afterwards." = "Die Icon-Form gilt für Apps, für die deine Themes kein Icon haben, und für Icons und Themes mit „iOS-Form“ (in ihrer Liste nach rechts wischen). Die anderen Theme-Icons behalten ihre eigene Form. Icon-Effekte sind die Unter- und Überlagerungen, die manche Themes mitbringen (Anemone-Effekte), sie werden in jedes App-Icon gezeichnet. Danach auf „Anwenden“ tippen.";
+"Fills the transparent parts of the icons marked \"iOS shape\" when the icon shape is \"iOS shape\". Light and dark mode each have their own background. Tap Apply afterwards." = "Füllt die transparenten Stellen der Icons mit „iOS-Form“, wenn die Icon-Form „iOS-Form“ ist. Heller und dunkler Modus haben je einen eigenen Hintergrund. Danach auf „Anwenden“ tippen.";
+"The background goes behind the icons marked \"iOS shape\" when the icon shape in Settings is \"iOS shape\", and shows where the icon is transparent. Tap Apply afterwards." = "Der Hintergrund liegt hinter den Icons mit „iOS-Form“, wenn die Icon-Form in den Einstellungen „iOS-Form“ ist, und ist sichtbar, wo das Icon transparent ist. Danach auf „Anwenden“ tippen.";
+"This shape is for the icons and themes marked \"iOS shape\" (swipe right in their list) and for the apps your themes have no icon for. All other theme icons keep their own shape. Tap Apply afterwards." = "Diese Form gilt für Icons und Themes mit „iOS-Form“ (in ihrer Liste nach rechts wischen) und für Apps, für die deine Themes kein Icon haben. Alle anderen Theme-Icons behalten ihre eigene Form. Danach auf „Anwenden“ tippen.";

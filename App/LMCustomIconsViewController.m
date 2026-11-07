@@ -320,8 +320,8 @@ static BOOL LMPreviewShape = NO;
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   if (![self listForSection:section].count) return nil;
-  if (section == LMIconSectionCustom) return LMLocalized(@"A custom icon replaces the icon of that app, whatever your themes say. Swipe right on an icon to give it the iOS shape. Tap Apply afterwards.");
-  return LMLocalized(@"These icons get the iOS icon shape when the icon shape in Settings is \"Theme's own shape\". Swipe right to give them their own shape back.");
+  if (section == LMIconSectionCustom) return LMLocalized(@"A custom icon replaces the icon of that app, whatever your themes say. Swipe right on an icon to give it the icon shape of the settings. Tap Apply afterwards.");
+  return LMLocalized(@"These icons get the icon shape of the settings. Swipe right to give them their own shape back.");
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -346,7 +346,8 @@ static BOOL LMPreviewShape = NO;
     BOOL dark = self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
     thumbnail = [LMCustomIconStore image:thumbnail overBackground:dark ? config.backgroundDark : config.backgroundLight];
   }
-  BOOL shaped = thumbnail && (indexPath.section == LMIconSectionIOSShape || LMPreviewShape);
+  // the marked icons get the shape of the settings: shown with the iOS shape when that is the one
+  BOOL shaped = thumbnail && ((indexPath.section == LMIconSectionIOSShape && [[LMConfigStore sharedStore].iconShape isEqualToString:LMIconShapeSystem]) || LMPreviewShape);
   content.image = thumbnail ? (shaped ? [LMCustomIconStore squircleImage:thumbnail] : thumbnail) : [UIImage systemImageNamed:@"photo"];
   content.imageProperties.maximumSize = CGSizeMake(48, 48);
   content.imageProperties.reservedLayoutSize = CGSizeMake(48, 48);

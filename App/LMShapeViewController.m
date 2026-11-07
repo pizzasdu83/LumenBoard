@@ -71,7 +71,7 @@ static UIImage *LMShapeImage(NSString *shape) {
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-  NSString *footer = LMLocalized(@"\"Theme's own shape\" and \"iOS shape\" only change theme icons. The other shapes change every app icon, also apps your themes have no icon for. Tap Apply afterwards.");
+  NSString *footer = LMLocalized(@"This shape is for the icons and themes marked \"iOS shape\" (swipe right in their list) and for the apps your themes have no icon for. All other theme icons keep their own shape. Tap Apply afterwards.");
   if ([_shapes containsObject:LMIconShapeThemeMask]) {
     NSString *mask = _hasThemeMask ? LMLocalized(@"\"Theme mask\" uses the icon mask of your active themes.") : LMLocalized(@"None of your active themes has an icon mask, \"Theme mask\" works like \"Theme's own shape\".");
     footer = [footer stringByAppendingFormat:@"\n\n%@", mask];

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3
+- The icon shape of the settings is for the apps your themes have no icon for and for the icons and themes marked "iOS shape" (swipe right). The other theme icons keep their own shape
+- The icon background goes behind the marked icons when the icon shape is "iOS shape"
+
 ## 1.5.2
 - The previews in the Custom icons screen show the icon background when the preview button at the top is on (together with the iOS shape)
 

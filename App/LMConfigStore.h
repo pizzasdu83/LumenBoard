@@ -12,9 +12,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *iconShape;
 // underlays/overlays from the active themes
 @property (nonatomic) BOOL iconEffects;
-// With the icon shape "Theme's own shape": lowercased bundle ids whose icon gets the iOS shape anyway
+// lowercased bundle ids whose icon gets the icon shape of the settings (marked "iOS shape")
 @property (nonatomic, copy) NSArray<NSString *> *shapeApps;
-// With the icon shape "Theme's own shape": theme folder names whose icons all get the iOS shape
+// theme folder names whose icons all get the icon shape of the settings (marked "iOS shape")
 @property (nonatomic, copy) NSArray<NSString *> *shapeThemes;
 // the background behind the icons with the iOS shape in light and dark mode, see LMConfigBackgroundLight. Empty: none.
 @property (nonatomic, copy) NSDictionary *backgroundLight;
