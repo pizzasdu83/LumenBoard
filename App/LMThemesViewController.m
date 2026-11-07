@@ -4,6 +4,7 @@
 #import "LMCustomIconsViewController.h"
 #import "LMZipImporter.h"
 #import "LMDebImporter.h"
+#import "LMHelpViewController.h"
 #import "LMConfigStore.h"
 #import "../Shared/LMThemeLibrary.h"
 #import <ImageIO/ImageIO.h>
@@ -94,7 +95,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 
 - (void)viewDidLoad {
   [super viewDidLoad];
-  self.title = @"LumenBoard";
+  self.title = @"Slippery Board";
   _details = [NSMutableDictionary new];
   _loading = [NSMutableSet new];
   // one theme at a time, so the visible ones are done first
@@ -102,6 +103,14 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"Theme"];
   self.tableView.rowHeight = 64;
   self.tableView.allowsSelectionDuringEditing = YES;
+
+  // a link at the bottom of the page
+  UIButton *help = [UIButton buttonWithType:UIButtonTypeSystem];
+  NSDictionary *linkAttributes = @{ NSUnderlineStyleAttributeName : @(NSUnderlineStyleSingle), NSFontAttributeName : [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote] };
+  [help setAttributedTitle:[[NSAttributedString alloc] initWithString:LMLocalized(@"How does this work?") attributes:linkAttributes] forState:UIControlStateNormal];
+  [help addTarget:self action:@selector(showHelp) forControlEvents:UIControlEventTouchUpInside];
+  help.frame = CGRectMake(0, 0, 100, 60);
+  self.tableView.tableFooterView = help;
 
   UIBarButtonItem *settingsItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"gearshape"] style:UIBarButtonItemStylePlain target:self action:@selector(showSettings)];
   UIBarButtonItem *customIconsItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"photo.on.rectangle"] style:UIBarButtonItemStylePlain target:self action:@selector(showCustomIcons)];
@@ -214,7 +223,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
     [self updateApplyButton];
     return YES;
   }
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Couldn't save") message:[NSString stringWithFormat:LMLocalized(@"%@\n\nLumenBoard has to be installed as a package (not as an IPA) so it can write its settings."), error.localizedDescription] preferredStyle:UIAlertControllerStyleAlert];
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Couldn't save") message:[NSString stringWithFormat:LMLocalized(@"%@\n\nSlippery Board has to be installed as a package (not as an IPA) so it can write its settings."), error.localizedDescription] preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
   [self presentViewController:alert animated:YES completion:nil];
   return NO;
@@ -305,6 +314,10 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   [self.navigationController pushViewController:[LMSettingsViewController new] animated:YES];
 }
 
+- (void)showHelp {
+  [self.navigationController pushViewController:[LMHelpViewController new] animated:YES];
+}
+
 - (void)showCustomIcons {
   [self.navigationController pushViewController:[LMCustomIconsViewController new] animated:YES];
 }
@@ -382,7 +395,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 
 - (void)confirmDeleteTheme:(NSString *)theme {
   NSString *name = [LMThemeLibrary displayNameForTheme:theme];
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Delete theme?") message:[NSString stringWithFormat:LMLocalized(@"%@ is deleted from LumenBoard. You can import it again later."), name] preferredStyle:UIAlertControllerStyleAlert];
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Delete theme?") message:[NSString stringWithFormat:LMLocalized(@"%@ is deleted from Slippery Board. You can import it again later."), name] preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
   [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"Delete") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
     NSError *error;

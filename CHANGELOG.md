@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.0
+- LumenBoard is now called Slippery Board (the name you see: app, package, texts). Settings, files and the package id stay the same, so nothing is lost
+- The icon shape is "iOS shape" by default (a new config; yours stays as you set it)
+- A link "How does this work?" at the bottom of the main page opens a short explanation of the screens and settings
+
 ## 1.5.4
 - The icon background now also goes into the marked icons when the icon shape is a custom one (circle, rounded square, square, teardrop, theme mask), not only with the iOS shape. It is cut by the shape
 - The previews of the Custom icons screen show the icon shape of the settings

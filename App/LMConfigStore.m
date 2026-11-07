@@ -69,7 +69,7 @@ static NSArray<NSString *> *LMNormalizedList(NSArray<NSString *> *list, BOOL low
 - (NSDictionary *)dictionaryRepresentation {
   return @{
     LMConfigEnabledThemes : _enabledThemes ? : @[],
-    LMConfigIconShape : _iconShape ? : LMIconShapeTheme,
+    LMConfigIconShape : _iconShape ? : LMIconShapeSystem,
     LMConfigIconEffects : @(_iconEffects),
     LMConfigKeepIconsInDarkAndTinted : @(_keepIconsInDarkAndTinted),
     LMConfigCustomIconsRevision : _customIconsRevision ? : @"",

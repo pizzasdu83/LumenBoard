@@ -1,8 +1,8 @@
 <p align="center">
-  <img src=".github/icon.png" width="120" alt="LumenBoard icon">
+  <img src=".github/icon.png" width="120" alt="Slippery Board icon">
 </p>
 
-<h1 align="center">LumenBoard</h1>
+<h1 align="center">Slippery Board</h1>
 
 <p align="center">
   Icon theme engine for iOS 17 - 26<br>
@@ -36,7 +36,7 @@
 1. Download the .deb for your jailbreak from [Releases](../../releases/latest)
 2. Install it with Sileo, Zebra or Filza
 3. Put your themes in `/Library/Themes` (rootless: `/var/jb/Library/Themes`)
-4. Open LumenBoard, turn on your themes and tap **Apply**
+4. Open Slippery Board, turn on your themes and tap **Apply**
 
 > Don't use it together with SnowBoard, Anemone or NeonBoard. Themes that need SnowBoard or Anemone install fine.
 

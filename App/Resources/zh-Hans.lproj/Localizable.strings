@@ -9,7 +9,7 @@
 "No themes installed" = "未安装任何主题";
 "Install themes from your package manager. They are stored in %@." = "请通过软件包管理器安装主题。主题存放于 %@。";
 "Couldn't save" = "无法保存";
-"%@\n\nLumenBoard has to be installed as a package (not as an IPA) so it can write its settings." = "%@\n\nLumenBoard 需要以软件包形式（而非 IPA）安装，才能写入设置。";
+"%@\n\nSlippery Board has to be installed as a package (not as an IPA) so it can write its settings." = "%@\n\nSlippery Board 需要以软件包形式（而非 IPA）安装，才能写入设置。";
 "OK" = "好";
 "Settings" = "设置";
 "Icon cache" = "图标缓存";
@@ -29,10 +29,10 @@
 "Close" = "关闭";
 "Respringing…" = "正在注销…";
 "Rendering icons: %u of %u" = "正在渲染图标：%u / %u";
-"SpringBoard didn't answer. Make sure LumenBoard is enabled in your tweak injector, respring once and try again." = "SpringBoard 未响应。请确认 LumenBoard 已在你的插件注入器中启用，注销一次后重试。";
+"SpringBoard didn't answer. Make sure Slippery Board is enabled in your tweak injector, respring once and try again." = "SpringBoard 未响应。请确认 Slippery Board 已在你的插件注入器中启用，注销一次后重试。";
 "Troubleshooting" = "故障排查";
 "Diagnostics" = "诊断";
-"Shows what LumenBoard did in SpringBoard and iconservicesagent. Copy the report if your icons don't change." = "显示 LumenBoard 在 SpringBoard 和 iconservicesagent 中执行的操作。如果图标没有变化，可复制此报告。";
+"Shows what Slippery Board did in SpringBoard and iconservicesagent. Copy the report if your icons don't change." = "显示 Slippery Board 在 SpringBoard 和 iconservicesagent 中执行的操作。如果图标没有变化，可复制此报告。";
 "Copy report" = "复制报告";
 "Loading…" = "正在加载…";
 "Report copied" = "报告已复制";

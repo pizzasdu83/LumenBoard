@@ -88,7 +88,9 @@ static inline NSArray<NSString *> *LMIconShapes(void) {
 static inline NSString *LMIconShapeFromConfig(NSDictionary *config) {
   NSString *shape = config[LMConfigIconShape];
   if ([shape isKindOfClass:[NSString class]] && [LMIconShapes() containsObject:shape]) return shape;
-  return [config[LMConfigUseSystemIconShape] boolValue] ? LMIconShapeSystem : LMIconShapeTheme;
+  // configs before 1.1.0 have one switch for the iOS shape, a new config has the iOS shape
+  id legacy = config[LMConfigUseSystemIconShape];
+  return (legacy && ![legacy boolValue]) ? LMIconShapeTheme : LMIconShapeSystem;
 }
 
 static inline BOOL LMIconEffectsFromConfig(NSDictionary *config) {

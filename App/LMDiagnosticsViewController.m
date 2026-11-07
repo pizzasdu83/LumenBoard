@@ -112,7 +112,7 @@ static NSString *LMDiagnosticsReport(void) {
   struct utsname name;
   uname(&name);
   NSString *root = LMRootPath(@"");
-  [report appendFormat:@"LumenBoard %@\n", [NSBundle mainBundle].infoDictionary[@"CFBundleShortVersionString"]];
+  [report appendFormat:@"Slippery Board %@\n", [NSBundle mainBundle].infoDictionary[@"CFBundleShortVersionString"]];
   NSOperatingSystemVersion version = [NSProcessInfo processInfo].operatingSystemVersion;
   [report appendFormat:@"%s, iOS %ld.%ld.%ld\n", name.machine, (long)version.majorVersion, (long)version.minorVersion, (long)version.patchVersion];
   [report appendFormat:@"Jailbreak: %@, root %@ -> %@\n", LMJailbreakName(), root.length ? root : @"/", [(root.length ? root : @"/") stringByResolvingSymlinksInPath]];
@@ -186,7 +186,7 @@ static NSString *LMDiagnosticsReport(void) {
   }
 
   [report appendString:@"\nLast \"Rebuild icons\"\n"];
-  LMAppendRebuild(report, @"LumenBoard app", [NSDictionary dictionaryWithContentsOfFile:LMStatusPath(@"RebuildApp")]);
+  LMAppendRebuild(report, @"Slippery Board app", [NSDictionary dictionaryWithContentsOfFile:LMStatusPath(@"RebuildApp")]);
   LMAppendRebuild(report, @"SpringBoard", [NSDictionary dictionaryWithContentsOfFile:LMStatusPath(@"Rebuild")]);
 
   LMAppendProcess(report, @"SpringBoard", springBoard, @"LumenBoardCore isn't loaded in SpringBoard");

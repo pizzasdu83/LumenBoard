@@ -28,7 +28,7 @@ static NSDictionary *LMWipeWithRootHelper(void) {
   NSMutableDictionary *result = [NSMutableDictionary new];
   NSString *euid = values[@"euid"];
   if (!euid) {
-    result[@"Helper"] = timedOut ? @"didn't answer, it isn't running (install LumenBoard again or reboot)" : @"answered without a result";
+    result[@"Helper"] = timedOut ? @"didn't answer, it isn't running (install Slippery Board again or reboot)" : @"answered without a result";
     return result;
   }
   result[@"Helper"] = [euid isEqualToString:@"0"] ? @"ran as root" : [NSString stringWithFormat:@"ran as uid %@, not root", euid];
@@ -206,7 +206,7 @@ static NSString *LMWipeSummary(NSDictionary *wipe) {
   _symbol.image = [UIImage systemImageNamed:@"exclamationmark.triangle.fill" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:52 weight:UIImageSymbolWeightMedium]];
   _symbol.tintColor = [UIColor systemOrangeColor];
   _progressView.hidden = YES;
-  _statusLabel.text = LMLocalized(@"SpringBoard didn't answer. Make sure LumenBoard is enabled in your tweak injector, respring once and try again.");
+  _statusLabel.text = LMLocalized(@"SpringBoard didn't answer. Make sure Slippery Board is enabled in your tweak injector, respring once and try again.");
   _closeButton.hidden = NO;
   self.modalInPresentation = NO;
 }

@@ -8,7 +8,7 @@
 "%lu icons" = "%lu Icons";
 "No themes installed" = "Keine Themes installiert";
 "Couldn't save" = "Speichern fehlgeschlagen";
-"%@\n\nLumenBoard has to be installed as a package (not as an IPA) so it can write its settings." = "%@\n\nLumenBoard muss als Paket (nicht als IPA) installiert sein, damit es seine Einstellungen speichern kann.";
+"%@\n\nSlippery Board has to be installed as a package (not as an IPA) so it can write its settings." = "%@\n\nSlippery Board muss als Paket (nicht als IPA) installiert sein, damit es seine Einstellungen speichern kann.";
 "OK" = "OK";
 "Settings" = "Einstellungen";
 "Icon cache" = "Icon-Cache";
@@ -23,10 +23,10 @@
 "Close" = "Schließen";
 "Respringing…" = "Respring …";
 "Rendering icons: %u of %u" = "Icons werden gerendert: %u von %u";
-"SpringBoard didn't answer. Make sure LumenBoard is enabled in your tweak injector, respring once and try again." = "SpringBoard hat nicht geantwortet. Prüfe, ob LumenBoard in deinem Tweak-Injector aktiviert ist, mach einen Respring und versuche es erneut.";
+"SpringBoard didn't answer. Make sure Slippery Board is enabled in your tweak injector, respring once and try again." = "SpringBoard hat nicht geantwortet. Prüfe, ob Slippery Board in deinem Tweak-Injector aktiviert ist, mach einen Respring und versuche es erneut.";
 "Troubleshooting" = "Fehlerbehebung";
 "Diagnostics" = "Diagnose";
-"Shows what LumenBoard did in SpringBoard and iconservicesagent. Copy the report if your icons don't change." = "Zeigt, was LumenBoard in SpringBoard und iconservicesagent gemacht hat. Kopiere den Bericht, wenn sich deine Icons nicht ändern.";
+"Shows what Slippery Board did in SpringBoard and iconservicesagent. Copy the report if your icons don't change." = "Zeigt, was Slippery Board in SpringBoard und iconservicesagent gemacht hat. Kopiere den Bericht, wenn sich deine Icons nicht ändern.";
 "Copy report" = "Bericht kopieren";
 "Loading…" = "Wird geladen …";
 "Report copied" = "Bericht kopiert";
@@ -56,7 +56,7 @@
 "Themes imported" = "Themes importiert";
 "Couldn't import" = "Import fehlgeschlagen";
 "Delete theme?" = "Theme löschen?";
-"%@ is deleted from LumenBoard. You can import it again later." = "%@ wird aus LumenBoard gelöscht. Du kannst es später erneut importieren.";
+"%@ is deleted from Slippery Board. You can import it again later." = "%@ wird aus Slippery Board gelöscht. Du kannst es später erneut importieren.";
 "Delete" = "Löschen";
 "Couldn't delete" = "Löschen fehlgeschlagen";
 "Remove" = "Entfernen";
@@ -108,3 +108,12 @@
 "Preview with the icon shape and background" = "Vorschau mit Icon-Form und Hintergrund";
 "Fills the transparent parts of the icons marked \"iOS shape\", inside their icon shape. It does not work with the icon shape \"Theme's own shape\". Light and dark mode each have their own background. Tap Apply afterwards." = "Füllt die transparenten Stellen der Icons mit „iOS-Form“, innerhalb ihrer Icon-Form. Funktioniert nicht mit der Icon-Form „Form vom Theme“. Heller und dunkler Modus haben je einen eigenen Hintergrund. Danach auf „Anwenden“ tippen.";
 "The background goes behind the icons marked \"iOS shape\", inside their icon shape, and shows where the icon is transparent. It does not work with the icon shape \"Theme's own shape\". Tap Apply afterwards." = "Der Hintergrund liegt hinter den Icons mit „iOS-Form“, innerhalb ihrer Icon-Form, und ist sichtbar, wo das Icon transparent ist. Funktioniert nicht mit der Icon-Form „Form vom Theme“. Danach auf „Anwenden“ tippen.";
+"How does this work?" = "Wie funktioniert das?";
+"Themes" = "Themes";
+"Install icon themes with your package manager, or import a zip or a .deb with the button at the top right. Tap a theme to turn it on. When several active themes have an icon for the same app, the one higher up wins: tap Edit to change the order." = "Installiere Icon-Themes über deinen Paketmanager oder importiere ein Zip oder eine .deb mit dem Button oben rechts. Tippe auf ein Theme, um es zu aktivieren. Haben mehrere aktive Themes ein Icon für dieselbe App, gewinnt das weiter oben: Tippe auf Bearbeiten, um die Reihenfolge zu ändern.";
+"Nothing changes on your home screen until you tap Apply. It draws the icons of your active themes and your custom icons. If an icon still looks wrong afterwards, use Rebuild icons in Settings." = "Auf deinem Home-Bildschirm ändert sich nichts, bis du auf „Anwenden“ tippst. Es zeichnet die Icons deiner aktiven Themes und deine eigenen Icons. Sieht ein Icon danach noch falsch aus, nutze „Icons neu aufbauen“ in den Einstellungen.";
+"The photo button at the top left lets you pick an image for a single app, from Photos or Files. A custom icon wins over every theme." = "Mit dem Foto-Button oben links wählst du ein Bild für eine einzelne App, aus Fotos oder Dateien. Ein eigenes Icon gewinnt gegenüber jedem Theme.";
+"In Settings, the icon shape (iOS shape, circle, rounded square, square, teardrop or the shape of a theme) is used for the apps your themes have no icon for and for the icons and themes you marked: swipe right on an icon in the Custom icons screen, or on an active theme. The other theme icons keep their own shape." = "In den Einstellungen gilt die Icon-Form (iOS-Form, Kreis, abgerundetes Quadrat, Quadrat, Tropfen oder die Form eines Themes) für Apps, für die deine Themes kein Icon haben, und für die Icons und Themes, die du markiert hast: Wische im Bildschirm „Eigene Icons“ bei einem Icon oder bei einem aktiven Theme nach rechts. Die anderen Theme-Icons behalten ihre eigene Form.";
+"In Settings, light and dark mode each get a background: a color, a gradient or an image. It goes behind the marked icons and shows where their icon is transparent. It does not work with the icon shape \"Theme's own shape\"." = "In den Einstellungen bekommen heller und dunkler Modus je einen Hintergrund: eine Farbe, einen Verlauf oder ein Bild. Er liegt hinter den markierten Icons und ist sichtbar, wo ihr Icon transparent ist. Er funktioniert nicht mit der Icon-Form „Form vom Theme“.";
+"Some themes bring an underlay and an overlay (Anemone effects). Turn on Icon effects in Settings to draw them into your icons." = "Manche Themes bringen eine Unter- und eine Überlagerung mit (Anemone-Effekte). Aktiviere „Icon-Effekte“ in den Einstellungen, um sie in deine Icons zu zeichnen.";
+"If something doesn't look right, try Rebuild icons first. Diagnostics in Settings shows what happened and can be copied to share." = "Wenn etwas nicht richtig aussieht, versuche zuerst „Icons neu aufbauen“. Die Diagnose in den Einstellungen zeigt, was passiert ist, und lässt sich zum Teilen kopieren.";
