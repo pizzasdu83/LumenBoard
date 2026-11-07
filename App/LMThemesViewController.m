@@ -418,7 +418,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   if (section == LMThemeSectionActive)
-    return _active.count ? [NSString stringWithFormat:@"%@ %@", LMLocalized(@"When several themes have an icon for the same app, the one higher up wins. Tap Edit to change the order."), LMLocalized(@"Swipe right on an active theme to give all its icons the custom icon shape of the settings instead of the iOS shape.")] : LMLocalized(@"Tap a theme below to activate it.");
+    return _active.count ? [NSString stringWithFormat:@"%@ %@", LMLocalized(@"When several themes have an icon for the same app, the one higher up wins. Tap Edit to change the order."), LMLocalized(@"Swipe right on an active theme to give all its icons the iOS shape (with the icon shape \"Theme's own shape\").")] : LMLocalized(@"Tap a theme below to activate it.");
   return _installed.count ? nil : LMLocalized(@"All installed themes are active.");
 }
 
@@ -434,7 +434,7 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   else if (details) content.secondaryText = [NSString localizedStringWithFormat:LMLocalized(@"%lu icons"), (unsigned long)[details[@"Count"] unsignedIntegerValue]];
   else content.secondaryText = LMLocalized(@"Loading…");
   if (theme && [[LMConfigStore sharedStore].shapeThemes containsObject:theme] && !details[@"Error"])
-    content.secondaryText = [NSString stringWithFormat:@"%@ · %@", content.secondaryText, LMLocalized(@"Custom shape")];
+    content.secondaryText = [NSString stringWithFormat:@"%@ · %@", content.secondaryText, LMLocalized(@"iOS shape")];
   content.secondaryTextProperties.color = [UIColor secondaryLabelColor];
   content.image = details[@"Preview"] ? : [UIImage systemImageNamed:@"square.grid.2x2"];
   content.imageProperties.maximumSize = CGSizeMake(44, 44);
@@ -476,12 +476,12 @@ static UIImage *LMRenderPreview(NSArray<NSString *> *paths) {
   [self saveActiveThemes];
 }
 
-// swipe right: give the icons of an active theme the custom shape
+// swipe right: give the icons of an active theme the iOS shape
 - (UISwipeActionsConfiguration *)tableView:(UITableView *)tableView leadingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   NSString *theme = [self themeAtIndexPath:indexPath];
   if (!theme || indexPath.section != LMThemeSectionActive) return nil;
   BOOL shape = [[LMConfigStore sharedStore].shapeThemes containsObject:theme];
-  UIContextualAction *action = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal title:shape ? LMLocalized(@"iOS shape") : LMLocalized(@"Custom shape") handler:^(UIContextualAction *contextualAction, UIView *sourceView, void (^completion)(BOOL)) {
+  UIContextualAction *action = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal title:shape ? LMLocalized(@"Own shape") : LMLocalized(@"iOS shape") handler:^(UIContextualAction *contextualAction, UIView *sourceView, void (^completion)(BOOL)) {
     [self setIOSShape:!shape forTheme:theme];
     completion(YES);
   }];

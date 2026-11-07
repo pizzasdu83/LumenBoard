@@ -162,7 +162,7 @@ static NSString *LMDiagnosticsReport(void) {
   NSString *mask = [LMThemeLibrary iconMaskInThemes:config.enabledThemes];
   [report appendFormat:@"  theme underlay: %@, overlay: %@, mask: %@\n", effects[LMEffectUnderlay] ? : @"-", effects[LMEffectOverlay] ? : @"-", mask ? : @"-"];
   [report appendFormat:@"  On/Off Labels: %@\n", LMYesNo(UIAccessibilityIsOnOffSwitchLabelsEnabled())];
-  [report appendFormat:@"  custom shape for single icons: %lu apps, %lu themes\n", (unsigned long)config.shapeApps.count, (unsigned long)config.shapeThemes.count];
+  [report appendFormat:@"  iOS shape for single icons: %lu apps, %lu themes\n", (unsigned long)config.shapeApps.count, (unsigned long)config.shapeThemes.count];
 
   // icon map
   struct stat info;

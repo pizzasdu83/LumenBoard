@@ -151,16 +151,13 @@ static void LMReportProgress(uint32_t done, uint32_t total) {
 
 typedef CGImageRef (*LMStockIconFunction)(NSString *bundleIdentifier, CGFloat points, CGFloat scale, BOOL masked);
 
-// Draws the custom icon shape and the effects into the icons of the installed apps: theme icons from their png, the other apps from their own icon.
-// Marked icons and themes (isMarked) get customComposer, all the others baseComposer (the iOS shape, which iOS draws itself, so only effects).
-// An icon whose composer changes nothing is left alone.
+// Draws the icon shape and effects into the icons of the installed apps: theme icons from their png, the other apps from their own icon.
 // composeMissing NO (SpringBoard launch, has to be quick): only what's made already, else the last icon from the previous map.
-static void LMComposeIcons(NSMutableDictionary<NSString *, NSDictionary *> *icons, LMIconComposer *baseComposer, LMIconComposer *customComposer,
-                           BOOL (^isMarked)(NSString *bundleID, NSDictionary *icon), NSArray<LSApplicationProxy *> *apps,
+static void LMComposeIcons(NSMutableDictionary<NSString *, NSDictionary *> *icons, LMIconComposer *composer, NSArray<LSApplicationProxy *> *apps,
                            NSDictionary *previousIcons, BOOL composeMissing, NSMutableDictionary *status) {
   [[NSFileManager defaultManager] createDirectoryAtPath:LMComposedDirectory withIntermediateDirectories:YES attributes:nil error:nil];
   chmod(LMComposedDirectory.fileSystemRepresentation, 0755);
-  NSString *(^composedPath)(LMIconComposer *, NSString *) = ^NSString *(LMIconComposer *composer, NSString *material) {
+  NSString *(^composedPath)(NSString *) = ^NSString *(NSString *material) {
     return [LMComposedDirectory stringByAppendingPathComponent:[LMHash([composer.signature stringByAppendingFormat:@"\n%@", material]) stringByAppendingPathExtension:@"png"]];
   };
   // a previous map's icon for the app and slot, if it's still there
@@ -195,19 +192,13 @@ static void LMComposeIcons(NSMutableDictionary<NSString *, NSDictionary *> *icon
       continue;
     }
     @autoreleasepool {
-      LMIconComposer *composer = isMarked(bundleID, icon) ? customComposer : baseComposer;
       NSMutableDictionary *entry = [NSMutableDictionary new];
-      if (icon[LMIconTheme]) entry[LMIconTheme] = icon[LMIconTheme]; // the custom shape can be set for a whole theme
+      if (icon[LMIconTheme]) entry[LMIconTheme] = icon[LMIconTheme]; // the iOS shape can be set for a whole theme
       for (NSString *slot in @[LMIconLight, LMIconDark, LMIconTinted]) {
         if (!icon[slot]) continue;
-        if (!composer.changesIcons) {
-          // the theme icon as it is
-          entry[slot] = icon[slot];
-          continue;
-        }
         // dark and tinted artwork gets the shape, the underlay/overlay are drawn for the normal look
         BOOL effects = [slot isEqualToString:LMIconLight];
-        NSString *path = composedPath(composer, [NSString stringWithFormat:@"theme %@ %@ %@ effects=%d", slot, icon[slot], LMFileStamp(icon[slot]), effects]);
+        NSString *path = composedPath([NSString stringWithFormat:@"theme %@ %@ %@ effects=%d", slot, icon[slot], LMFileStamp(icon[slot]), effects]);
         if (access(path.fileSystemRepresentation, R_OK) == 0) {
           reused++;
         } else if (composeMissing) {
@@ -229,23 +220,16 @@ static void LMComposeIcons(NSMutableDictionary<NSString *, NSDictionary *> *icon
 
   // the other apps
   LMStockIconFunction stockIcon = (LMStockIconFunction)dlsym(RTLD_DEFAULT, "LMCoreCopyStockIconImage");
+  // keeps the iOS shape for "Theme's own shape", with "iOS shape" IconServices masks the finished icon
+  BOOL masked = [composer.shape isEqualToString:LMIconShapeTheme];
   CGFloat scale = 3;
+  CGFloat points = composer.pixelSize / scale;
   for (LSApplicationProxy *app in stockApps) {
     @autoreleasepool {
       NSString *bundleID = app.applicationIdentifier.lowercaseString;
-      BOOL marked = isMarked(bundleID, nil);
-      LMIconComposer *composer = marked ? customComposer : baseComposer;
-      // nothing to draw: the app keeps its own icon
-      if (!composer.changesIcons) {
-        if (composeMissing) LMReportProgress(++done, total);
-        continue;
-      }
-      // a marked app keeps the iOS shape for "Theme's own shape", with the iOS shape for the others IconServices masks the finished icon
-      BOOL masked = marked && [customComposer.shape isEqualToString:LMIconShapeTheme];
-      CGFloat points = composer.pixelSize / scale;
       // the app's icon changes with updates, its Info.plist does too
       NSString *infoPlist = app.bundleURL.path ? [app.bundleURL.path stringByAppendingPathComponent:@"Info.plist"] : nil;
-      NSString *path = composedPath(composer, [NSString stringWithFormat:@"stock %@ %@ masked=%d", bundleID, LMFileStamp(infoPlist), masked]);
+      NSString *path = composedPath([NSString stringWithFormat:@"stock %@ %@ masked=%d", bundleID, LMFileStamp(infoPlist), masked]);
       if (access(path.fileSystemRepresentation, R_OK) == 0) {
         reused++;
       } else if (composeMissing) {
@@ -306,24 +290,21 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
                                     LMConfigShapeApps : shapeApps,
                                     LMConfigShapeThemes : shapeThemes };
 
-  // Every icon has the iOS shape. Only the icons and themes marked with a swipe to the right get the custom shape of the settings.
-  NSDictionary *effects = iconEffects ? [LMThemeLibrary effectsInThemes:themes] : @{};
-  LMIconComposer *customComposer = [[LMIconComposer alloc] initWithShape:shape maskPath:[LMThemeLibrary iconMaskInThemes:themes] effects:effects];
-  LMIconComposer *baseComposer = [[LMIconComposer alloc] initWithShape:LMIconShapeSystem maskPath:nil effects:effects];
-  BOOL (^isMarked)(NSString *, NSDictionary *) = ^BOOL(NSString *bundleID, NSDictionary *icon) {
-    return [shapeApps containsObject:bundleID] || (icon[LMIconTheme] && [shapeThemes containsObject:icon[LMIconTheme]]);
-  };
-  BOOL changesIcons = baseComposer.changesIcons || customComposer.changesIcons;
+  LMIconComposer *composer = [[LMIconComposer alloc] initWithShape:shape maskPath:[LMThemeLibrary iconMaskInThemes:themes]
+                                                            effects:(iconEffects ? [LMThemeLibrary effectsInThemes:themes] : @{})];
+  BOOL systemShape = [composer.shape isEqualToString:LMIconShapeSystem];
+  // the icons and themes marked for the iOS shape only count when the icon shape is the theme's own
+  BOOL ownShape = [composer.shape isEqualToString:LMIconShapeTheme];
   NSDictionary *previous = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath];
-  if (changesIcons) {
+  if (composer.changesIcons) {
     NSDictionary *previousIcons = [previous[LMMapIcons] isKindOfClass:[NSDictionary class]] ? previous[LMMapIcons] : @{};
-    LMComposeIcons(icons, baseComposer, customComposer, isMarked, apps, previousIcons, composeIcons, status);
+    LMComposeIcons(icons, composer, apps, previousIcons, composeIcons, status);
   }
-  status[@"Shape"] = customComposer.shape;
-  status[@"Effects"] = changesIcons ? customComposer.signature : @"none";
+  status[@"Shape"] = composer.shape;
+  status[@"Effects"] = composer.changesIcons ? composer.signature : @"none";
 
   // hash everything that changes how an icon looks. Paths are saved as jailbreak paths (roothide renames the jbroot).
-  NSString *style = [NSString stringWithFormat:@"v%d shape=%@ keep=%d effects=%d light=%@ dark=%@", LMMapVersion, customComposer.shape, keepAppearance, changesIcons, LMBackgroundStyle(backgroundLight), LMBackgroundStyle(backgroundDark)];
+  NSString *style = [NSString stringWithFormat:@"v%d shape=%@ keep=%d effects=%d light=%@ dark=%@", LMMapVersion, composer.shape, keepAppearance, composer.changesIcons, LMBackgroundStyle(backgroundLight), LMBackgroundStyle(backgroundDark)];
   NSMutableDictionary *entries = [NSMutableDictionary new], *materials = [NSMutableDictionary new];
   NSMutableString *content = [NSMutableString stringWithFormat:@"%@\n%@\n%@\n", style, [themes componentsJoinedByString:@"/"], customRevision];
   for (NSString *bundleID in [icons.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
@@ -334,8 +315,9 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
       if (icon[slot]) entry[slot] = LMJailbreakPath(icon[slot]);
       [material appendFormat:@"|%@@%@", entry[slot] ? : @"", LMFileStamp(icon[slot])];
     }
-    // iOS masks the icon with its icon shape, unless it is marked for the custom shape (which is drawn into it, or the theme's own)
-    BOOL masked = isMarked(bundleID, icon) ? [customComposer.shape isEqualToString:LMIconShapeSystem] : YES;
+    // the iOS mask: for every icon with the "iOS shape" setting, else only for the icons and themes marked for it
+    BOOL marked = ownShape && ([shapeApps containsObject:bundleID] || (icon[LMIconTheme] && [shapeThemes containsObject:icon[LMIconTheme]]));
+    BOOL masked = systemShape || marked;
     entry[LMIconSystemShape] = @(masked);
     if ([icon[LMIconStock] boolValue]) entry[LMIconStock] = @YES;
     [material appendFormat:@"|%d|%@", masked, style];
@@ -347,7 +329,7 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
   if (backgroundLight) backgrounds[@"Light"] = backgroundLight;
   if (backgroundDark) backgrounds[@"Dark"] = backgroundDark;
   NSString *contentHash = LMHash(content);
-  if (!changesIcons) [[NSFileManager defaultManager] removeItemAtPath:LMComposedDirectory error:nil];
+  if (!composer.changesIcons) [[NSFileManager defaultManager] removeItemAtPath:LMComposedDirectory error:nil];
 
   if ([previous[@"Version"] integerValue] == LMMapVersion && [previous[@"ContentHash"] isEqual:contentHash]) return NO;
 
@@ -360,7 +342,7 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
     @"Version" : @(LMMapVersion),
     @"ContentHash" : contentHash,
     @"Generation" : generation,
-    LMConfigUseSystemIconShape : @YES, // maps before 1.1.0 have one setting for all icons, every entry has its own SystemShape now
+    LMConfigUseSystemIconShape : @(systemShape),
     LMConfigKeepIconsInDarkAndTinted : @(keepAppearance),
     LMMapBackground : backgrounds,
     LMMapAppliedConfig : appliedConfig,
@@ -374,7 +356,7 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
     return NO;
   }
   chmod(LMIconMapPath.fileSystemRepresentation, 0644);
-  if (changesIcons) LMRemoveUnusedComposedIcons(entries);
+  if (composer.changesIcons) LMRemoveUnusedComposedIcons(entries);
   return YES;
 }
 

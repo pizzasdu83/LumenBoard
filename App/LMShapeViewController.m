@@ -56,7 +56,7 @@ static UIImage *LMShapeImage(NSString *shape) {
 
 - (void)viewDidLoad {
   [super viewDidLoad];
-  self.title = LMLocalized(@"Custom icon shape");
+  self.title = LMLocalized(@"Icon shape");
   self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
   NSString *current = [LMConfigStore sharedStore].iconShape;
   _hasThemeMask = [LMThemeLibrary iconMaskInThemes:[LMConfigStore sharedStore].enabledThemes] != nil;
@@ -71,7 +71,7 @@ static UIImage *LMShapeImage(NSString *shape) {
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-  NSString *footer = LMLocalized(@"This shape is for the icons and themes marked with a swipe to the right (Custom icons screen and themes list). All other icons keep the iOS shape. The shapes other than \"Theme's own shape\" and \"iOS shape\" also work for apps your themes have no icon for. Tap Apply afterwards.");
+  NSString *footer = LMLocalized(@"\"Theme's own shape\" and \"iOS shape\" only change theme icons. The other shapes change every app icon, also apps your themes have no icon for. Tap Apply afterwards.");
   if ([_shapes containsObject:LMIconShapeThemeMask]) {
     NSString *mask = _hasThemeMask ? LMLocalized(@"\"Theme mask\" uses the icon mask of your active themes.") : LMLocalized(@"None of your active themes has an icon mask, \"Theme mask\" works like \"Theme's own shape\".");
     footer = [footer stringByAppendingFormat:@"\n\n%@", mask];
