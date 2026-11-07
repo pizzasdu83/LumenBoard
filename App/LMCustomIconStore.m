@@ -124,6 +124,56 @@ static UIColor *LMStoreColorFromHex(id hex) {
   }];
 }
 
+// rounded rect with its own radius per corner, as the home screen draws the shapes (the same numbers, y up)
+static CGPathRef LMCreateCornerPath(CGFloat size, CGFloat topLeft, CGFloat topRight, CGFloat bottomRight, CGFloat bottomLeft) {
+  CGMutablePathRef path = CGPathCreateMutable();
+  CGPathMoveToPoint(path, NULL, topLeft, size);
+  CGPathAddArcToPoint(path, NULL, size, size, size, size - topRight, topRight);
+  CGPathAddArcToPoint(path, NULL, size, 0, size - bottomRight, 0, bottomRight);
+  CGPathAddArcToPoint(path, NULL, 0, 0, 0, bottomLeft, bottomLeft);
+  CGPathAddArcToPoint(path, NULL, 0, size, topLeft, size, topLeft);
+  CGPathCloseSubpath(path);
+  return path;
+}
+
++ (UIImage *)image:(UIImage *)image inShape:(NSString *)shape maskPath:(NSString *)maskPath {
+  if ([shape isEqualToString:LMIconShapeSystem]) return [self squircleImage:image];
+  CGSize size = image.size;
+  CGFloat side = MIN(size.width, size.height);
+  if (side <= 0) return image;
+  CGFloat round = side / 2;
+  CGPathRef path = NULL;
+  UIImage *mask = nil;
+  BOOL square = [shape isEqualToString:LMIconShapeSquare];
+  if ([shape isEqualToString:LMIconShapeCircle]) path = LMCreateCornerPath(side, round, round, round, round);
+  else if ([shape isEqualToString:LMIconShapeRounded]) path = LMCreateCornerPath(side, side * 0.14, side * 0.14, side * 0.14, side * 0.14);
+  else if ([shape isEqualToString:LMIconShapeTeardrop]) path = LMCreateCornerPath(side, round, round, side * 0.12, round);
+  else if ([shape isEqualToString:LMIconShapeThemeMask]) mask = maskPath.length ? [UIImage imageWithContentsOfFile:maskPath] : nil;
+  if (!path && !square && !mask) return image; // the theme's own shape, or a mask that is missing
+
+  UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat preferredFormat];
+  format.scale = image.scale;
+  UIImage *result = [[[UIGraphicsImageRenderer alloc] initWithSize:size format:format] imageWithActions:^(UIGraphicsImageRendererContext *context) {
+    CGRect rect = CGRectMake(0, 0, size.width, size.height);
+    if (path) {
+      // the path counts y upwards, the image context downwards
+      CGAffineTransform flip = CGAffineTransformMake(1, 0, 0, -1, 0, size.height);
+      CGPathRef flipped = CGPathCreateCopyByTransformingPath(path, &flip);
+      CGContextAddPath(context.CGContext, flipped);
+      CGContextClip(context.CGContext);
+      CGPathRelease(flipped);
+    }
+    [image drawInRect:rect];
+    if (mask) {
+      // keeps the image where the mask is opaque
+      CGContextSetBlendMode(context.CGContext, kCGBlendModeDestinationIn);
+      [mask drawInRect:rect];
+    }
+  }];
+  CGPathRelease(path);
+  return result;
+}
+
 + (UIImage *)squircleImage:(UIImage *)image {
   CGFloat side = MAX(image.size.width, image.size.height);
   if (side <= 0) return image;

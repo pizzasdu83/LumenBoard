@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.4
+- The icon background now also goes into the marked icons when the icon shape is a custom one (circle, rounded square, square, teardrop, theme mask), not only with the iOS shape. It is cut by the shape
+- The previews of the Custom icons screen show the icon shape of the settings
+
 ## 1.5.3
 - The icon shape of the settings is for the apps your themes have no icon for and for the icons and themes marked "iOS shape" (swipe right). The other theme icons keep their own shape
 - The icon background goes behind the marked icons when the icon shape is "iOS shape"

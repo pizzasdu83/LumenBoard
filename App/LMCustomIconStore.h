@@ -18,6 +18,9 @@ NS_ASSUME_NONNULL_BEGIN
 // the icon over the background of the settings (a config background: Mode, Color, Color2, Angle, Image), like the home screen draws it.
 // The background is the same for every icon, nil or none: the icon as it is.
 + (UIImage *)image:(UIImage *)image overBackground:(nullable NSDictionary *)background;
+// the image in an icon shape (LMIconShape*) like LumenBoard draws it on the home screen. maskPath: the AppIconMask of the active themes,
+// for LMIconShapeThemeMask. The theme's own shape (and anything unknown) leaves the image as it is.
++ (UIImage *)image:(UIImage *)image inShape:(NSString *)shape maskPath:(nullable NSString *)maskPath;
 // the image clipped to the iOS icon shape (the continuous corners of a home screen icon)
 + (UIImage *)squircleImage:(UIImage *)image;
 

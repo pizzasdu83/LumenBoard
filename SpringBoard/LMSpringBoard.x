@@ -156,8 +156,8 @@ typedef CGImageRef (*LMStockIconFunction)(NSString *bundleIdentifier, CGFloat po
 // theme icons keep their own shape and only get the effects (plainComposer). An icon whose composer changes nothing is left alone.
 // composeMissing NO (SpringBoard launch, has to be quick): only what's made already, else the last icon from the previous map.
 static void LMComposeIcons(NSMutableDictionary<NSString *, NSDictionary *> *icons, LMIconComposer *composer, LMIconComposer *plainComposer,
-                           BOOL (^isMarked)(NSString *bundleID, NSDictionary *icon), NSArray<LSApplicationProxy *> *apps,
-                           NSDictionary *previousIcons, BOOL composeMissing, NSMutableDictionary *status) {
+                           BOOL (^isMarked)(NSString *bundleID, NSDictionary *icon), NSDictionary *backgroundLight, NSDictionary *backgroundDark,
+                           NSArray<LSApplicationProxy *> *apps, NSDictionary *previousIcons, BOOL composeMissing, NSMutableDictionary *status) {
   [[NSFileManager defaultManager] createDirectoryAtPath:LMComposedDirectory withIntermediateDirectories:YES attributes:nil error:nil];
   chmod(LMComposedDirectory.fileSystemRepresentation, 0755);
   NSString *(^composedPath)(LMIconComposer *, NSString *) = ^NSString *(LMIconComposer *maker, NSString *material) {
@@ -196,30 +196,43 @@ static void LMComposeIcons(NSMutableDictionary<NSString *, NSDictionary *> *icon
     }
     @autoreleasepool {
       // the shape of the settings for the marked icons and themes, the other theme icons keep their own shape
-      LMIconComposer *chosen = isMarked(bundleID, icon) ? composer : plainComposer;
+      BOOL marked = isMarked(bundleID, icon);
+      LMIconComposer *chosen = marked ? composer : plainComposer;
+      // A custom shape is drawn into the icon, so the background of the settings goes in with it. Behind the iOS shape the home screen draws it.
+      BOOL bakesBackground = marked && composer.drawsShape;
       NSMutableDictionary *entry = [NSMutableDictionary new];
       if (icon[LMIconTheme]) entry[LMIconTheme] = icon[LMIconTheme]; // the shape can be set for a whole theme
+      // what to draw: slot, artwork png, background
+      NSMutableArray<NSArray *> *jobs = [NSMutableArray new];
       for (NSString *slot in @[LMIconLight, LMIconDark, LMIconTinted]) {
         if (!icon[slot]) continue;
+        NSDictionary *background = !bakesBackground ? nil : ([slot isEqualToString:LMIconLight] ? backgroundLight : ([slot isEqualToString:LMIconDark] ? backgroundDark : nil));
+        [jobs addObject:@[slot, icon[slot], background ? : (id)[NSNull null]]];
+      }
+      // no dark icon, but a dark background: the normal icon goes over it
+      if (bakesBackground && backgroundDark && !icon[LMIconDark] && icon[LMIconLight]) [jobs addObject:@[LMIconDark, icon[LMIconLight], backgroundDark]];
+      for (NSArray *job in jobs) {
+        NSString *slot = job[0], *artwork = job[1];
+        NSDictionary *background = [job[2] isKindOfClass:[NSDictionary class]] ? job[2] : nil;
         if (!chosen.changesIcons) {
           // the theme icon as it is
-          entry[slot] = icon[slot];
+          entry[slot] = artwork;
           continue;
         }
         // dark and tinted artwork gets the shape, the underlay/overlay are drawn for the normal look
         BOOL effects = [slot isEqualToString:LMIconLight];
-        NSString *path = composedPath(chosen, [NSString stringWithFormat:@"theme %@ %@ %@ effects=%d", slot, icon[slot], LMFileStamp(icon[slot]), effects]);
+        NSString *path = composedPath(chosen, [NSString stringWithFormat:@"theme %@ %@ %@ effects=%d bg=%@", slot, artwork, LMFileStamp(artwork), effects, LMBackgroundStyle(background)]);
         if (access(path.fileSystemRepresentation, R_OK) == 0) {
           reused++;
         } else if (composeMissing) {
-          if ([chosen writeIconWithArtworkAtPath:icon[slot] effects:effects toPath:path]) made++;
+          if ([chosen writeIconWithArtworkAtPath:artwork effects:effects background:background toPath:path]) made++;
           else {
             failed++;
-            path = icon[slot];
+            path = artwork;
           }
         } else {
           pending++;
-          path = previousPath(bundleID, slot, NO) ? : icon[slot];
+          path = previousPath(bundleID, slot, NO) ? : artwork;
         }
         entry[slot] = path;
       }
@@ -313,7 +326,7 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
   NSDictionary *previous = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath];
   if (changesIcons) {
     NSDictionary *previousIcons = [previous[LMMapIcons] isKindOfClass:[NSDictionary class]] ? previous[LMMapIcons] : @{};
-    LMComposeIcons(icons, composer, plainComposer, isMarked, apps, previousIcons, composeIcons, status);
+    LMComposeIcons(icons, composer, plainComposer, isMarked, backgroundLight, backgroundDark, apps, previousIcons, composeIcons, status);
   }
   status[@"Shape"] = composer.shape;
   status[@"Effects"] = changesIcons ? composer.signature : @"none";

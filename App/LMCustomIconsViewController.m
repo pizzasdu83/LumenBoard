@@ -11,7 +11,7 @@ typedef NS_ENUM(NSInteger, LMIconSection) {
   LMIconSectionIOSShape,
 };
 
-// the button at the top shows every icon with the iOS shape and the background of the settings, to see what it would look like (default: icons as they are)
+// the button at the top shows every icon in the icon shape and with the background of the settings, to see what it would look like (default: icons as they are)
 static BOOL LMPreviewShape = NO;
 
 @interface LMCustomIconsViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIDocumentPickerDelegate>
@@ -22,6 +22,7 @@ static BOOL LMPreviewShape = NO;
   NSMutableArray<NSString *> *_shape;  // lowercased bundle ids that get the iOS shape
   NSDictionary<NSString *, LMAppInfo *> *_apps; // lowercased bundle id -> app, nil until loaded
   NSDictionary<NSString *, NSDictionary *> *_themeIcons; // what the active themes give, for the apps without a custom icon
+  NSString *_maskPath; // the AppIconMask of the active themes, for the shape "Theme mask"
   NSString *_pendingBundleID; // the app an image is being picked for
   UIBarButtonItem *_addItem;
   UIBarButtonItem *_shapeItem;
@@ -38,7 +39,7 @@ static BOOL LMPreviewShape = NO;
   self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
   _addItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addApp)];
   _shapeItem = [[UIBarButtonItem alloc] initWithImage:nil style:UIBarButtonItemStylePlain target:self action:@selector(toggleShape)];
-  _shapeItem.accessibilityLabel = LMLocalized(@"Preview the iOS shape");
+  _shapeItem.accessibilityLabel = LMLocalized(@"Preview with the icon shape and background");
   [self updateShapeItem];
   self.navigationItem.rightBarButtonItems = @[_addItem, _shapeItem];
   [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"Icon"];
@@ -97,6 +98,7 @@ static BOOL LMPreviewShape = NO;
   [shape sortUsingComparator:byName];
   _custom = custom;
   _shape = shape;
+  _maskPath = [LMThemeLibrary iconMaskInThemes:config.enabledThemes];
   // the icons of the active themes, for the apps in the iOS shape section that have no custom icon
   _themeIcons = _shape.count ? [LMThemeLibrary resolvedIconsForThemes:config.enabledThemes appNames:nil] : @{};
   [self.tableView reloadData];
@@ -339,16 +341,17 @@ static BOOL LMPreviewShape = NO;
   UIImage *thumbnail = [LMCustomIconStore thumbnailForBundleID:bundleID pixels:144];
   if (!thumbnail) thumbnail = [LMCustomIconStore thumbnailForPath:_themeIcons[bundleID][LMIconLight] pixels:144];
   if (!thumbnail) thumbnail = [LMAppCatalog iconForBundleID:_apps[bundleID].bundleID ? : bundleID];
-  // The icons that get the iOS shape are shown with it. With the preview button on, every icon is shown with the iOS shape
-  // and the background of the settings (the light or the dark one, like the current mode).
-  if (thumbnail && LMPreviewShape) {
+  // The marked icons are shown in the icon shape of the settings. With the preview button on, every icon is shown in that shape with the
+  // background of the settings (the light or the dark one, like the current mode).
+  if (thumbnail) {
     LMConfigStore *config = [LMConfigStore sharedStore];
-    BOOL dark = self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
-    thumbnail = [LMCustomIconStore image:thumbnail overBackground:dark ? config.backgroundDark : config.backgroundLight];
+    if (LMPreviewShape) {
+      BOOL dark = self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+      thumbnail = [LMCustomIconStore image:thumbnail overBackground:dark ? config.backgroundDark : config.backgroundLight];
+    }
+    if (indexPath.section == LMIconSectionIOSShape || LMPreviewShape) thumbnail = [LMCustomIconStore image:thumbnail inShape:config.iconShape maskPath:_maskPath];
   }
-  // the marked icons get the shape of the settings: shown with the iOS shape when that is the one
-  BOOL shaped = thumbnail && ((indexPath.section == LMIconSectionIOSShape && [[LMConfigStore sharedStore].iconShape isEqualToString:LMIconShapeSystem]) || LMPreviewShape);
-  content.image = thumbnail ? (shaped ? [LMCustomIconStore squircleImage:thumbnail] : thumbnail) : [UIImage systemImageNamed:@"photo"];
+  content.image = thumbnail ? : [UIImage systemImageNamed:@"photo"];
   content.imageProperties.maximumSize = CGSizeMake(48, 48);
   content.imageProperties.reservedLayoutSize = CGSizeMake(48, 48);
   content.imageProperties.cornerRadius = 0;

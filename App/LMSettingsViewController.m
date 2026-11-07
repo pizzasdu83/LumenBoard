@@ -130,7 +130,7 @@ static BOOL LMUseCheckmarksForToggles(void) {
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   switch (section) {
     case LMSettingsSectionIcons: return LMLocalized(@"The icon shape is for the apps your themes have no icon for and for the icons and themes marked \"iOS shape\" (swipe right in their list). The other theme icons keep their own shape. Icon effects are the underlays and overlays some themes bring along (Anemone effects), they are drawn into every app icon. Tap Apply afterwards.");
-    case LMSettingsSectionBackground: return LMLocalized(@"Fills the transparent parts of the icons marked \"iOS shape\" when the icon shape is \"iOS shape\". Light and dark mode each have their own background. Tap Apply afterwards.");
+    case LMSettingsSectionBackground: return LMLocalized(@"Fills the transparent parts of the icons marked \"iOS shape\", inside their icon shape. It does not work with the icon shape \"Theme's own shape\". Light and dark mode each have their own background. Tap Apply afterwards.");
     case LMSettingsSectionIconCache: return LMLocalized(@"Rebuild icons deletes the icon cache of iOS and respring. Use it if icons still look wrong after installing or updating themes.");
     case LMSettingsSectionTroubleshooting: return LMLocalized(@"Shows what LumenBoard did in SpringBoard and iconservicesagent. Copy the report if your icons don't change.");
   }
