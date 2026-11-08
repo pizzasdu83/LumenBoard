@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0
+- "How does this work?" now shows images, tables and HTML too: the Markdown file is shown in a web view (JavaScript off). Images of the app (![](help/step1.png) or <img src="help/step1.png">) and https images work
+- Tables, nested and task lists, ~~strikethrough~~, quotes, code blocks, links to a part of the page, and HTML such as <details> and <img width=...>
+
+## 1.6.1
+- "How does this work?" now shows a Markdown file of the app (App/Resources/HowItWorks.md, German in de.lproj/HowItWorks.md) instead of a text in the code
+
 ## 1.6.0
 - LumenBoard is now called Slippery Board (the name you see: app, package, texts). Settings, files and the package id stay the same, so nothing is lost
 - The icon shape is "iOS shape" by default (a new config; yours stays as you set it)
