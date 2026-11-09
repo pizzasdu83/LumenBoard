@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.1
+- "How does this work?" is drawn with normal iOS views again (the web view of 1.7.0 showed nothing in this app). It still shows images, tables and <br>; the rest of the HTML of 1.7.0 is gone
+
 ## 1.7.0
 - "How does this work?" now shows images, tables and HTML too: the Markdown file is shown in a web view (JavaScript off). Images of the app (![](help/step1.png) or <img src="help/step1.png">) and https images work
 - Tables, nested and task lists, ~~strikethrough~~, quotes, code blocks, links to a part of the page, and HTML such as <details> and <img width=...>
