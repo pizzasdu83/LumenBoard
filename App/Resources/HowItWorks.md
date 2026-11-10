@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/pizzasdu83/LumenBoard/refs/heads/main/.github/icon.png" height="128" >
+
 # How does this work?
 
 Slippery Board draws your own icons on the home screen. You choose the themes, icons and options here, then tap **Apply**.
