@@ -1,22 +1,37 @@
-local image:
-
-<img src="AppIcon60x60@3x.png" width="128" >
-
-2nd local:
-
-![icnonon](AppIcon60x60@2x.png)
-
-online image:
-
-<img src="https://raw.githubusercontent.com/pizzasdu83/LumenBoard/refs/heads/main/.github/icon.png" width="128" >
-
-last img tset:
-
-<img src="https://raw.githubusercontent.com/pizzasdu83/LumenBoard/refs/heads/main/App/Resources/AppIcon60x60%402x.png">
+![icno](AppIcon60x60@2x.png)
 
 # How does this work?
 
 Slippery Board draws your own icons on the home screen. You choose the themes, icons and options here, then tap **Apply**.
+
+# Icons: 
+![settings](sett.png) settings (obviously)
+
+![appobo](onebyone.png) custom icons: let's you pick apps one by one and change their icons.
+
+![addt](addtheme.png) add themes, either with a zip, either with a deb.
+#### **Edit**:
+edit the order (priority) or remove themes
+
+![addapp](addapp.png) change the icon of one app
+
+![cropreview](cropreview.png) this will be filled when activated. It previews the crop and the fill color/image.
+
+![dlt](delete.png)
+
+To delete swipe an icon to the left.
+
+![ioshape](ioshape.png)
+
+To the app to an iOS shape version swipe an icon to the right side.
+
+![ioshapea](ioshapea.png)
+
+It should go down after that.
+
+![ioshapet](ioshapet.png)
+
+It's the same gesture for normal themes, but instead of going in a new section, it will stay here and show "iOS shape" underneath.
 
 ## Themes
 
@@ -45,12 +60,12 @@ In Settings, the **icon shape** is one of:
 - teardrop
 - the shape of a theme
 
-| Icon shape | What you get |
-|---|---|
-| iOS shape | The iOS icon shape on the marked icons. The background is drawn by the home screen |
+| Icon shape                               | What you get                                                                                             |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| iOS shape                                | The iOS icon shape on the marked icons. The background is drawn by the home screen                       |
 | Circle, rounded square, square, teardrop | That shape, drawn into the marked icons and the apps without a theme icon, with the background inside it |
-| Theme mask | The mask a theme brings along (AppIconMask) |
-| Theme's own shape | Nothing changes, and no background |
+| Theme mask                               | The mask a theme brings along (AppIconMask)                                                              |
+| Theme's own shape                        | Nothing changes, and no background                                                                       |
 
 It is used for the apps your themes have no icon for, and for the icons and themes you **marked "iOS shape"**: swipe right on an icon in the Custom icons screen, or on an active theme. The other theme icons keep their own shape.
 
