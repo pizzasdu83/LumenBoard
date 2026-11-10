@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.2
+- Fixed: "How does this work?" stayed empty, its header still declared a table screen while the page is a normal screen
+
 ## 1.7.1
 - "How does this work?" is drawn with normal iOS views again (the web view of 1.7.0 showed nothing in this app). It still shows images, tables and <br>; the rest of the HTML of 1.7.0 is gone
 
