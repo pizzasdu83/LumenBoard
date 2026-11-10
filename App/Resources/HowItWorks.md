@@ -1,10 +1,18 @@
 local image:
 
-<img src="\AppIcon60x60@3x.png" height="128" >
+<img src="AppIcon60x60@3x.png" width="128" >
+
+2nd local:
+
+![icnonon](AppIcon60x60@2x.png)
 
 online image:
 
-<img src="https://raw.githubusercontent.com/pizzasdu83/LumenBoard/refs/heads/main/.github/icon.png" height="128" >
+<img src="https://raw.githubusercontent.com/pizzasdu83/LumenBoard/refs/heads/main/.github/icon.png" width="128" >
+
+last img tset:
+
+<img src="https://raw.githubusercontent.com/pizzasdu83/LumenBoard/refs/heads/main/App/Resources/AppIcon60x60%402x.png">
 
 # How does this work?
 
