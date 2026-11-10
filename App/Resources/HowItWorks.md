@@ -1,3 +1,9 @@
+local image:
+
+<img src="\AppIcon60x60@3x.png" height="128" >
+
+online image:
+
 <img src="https://raw.githubusercontent.com/pizzasdu83/LumenBoard/refs/heads/main/.github/icon.png" height="128" >
 
 # How does this work?
