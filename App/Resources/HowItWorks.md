@@ -4,7 +4,7 @@
 
 Slippery Board draws your own icons on the home screen. You choose the themes, icons and options here, then tap **Apply**.
 
-## [Video tutorial:](https://www.youtube.com/watch?v=dtCZMge7oHQ) https://www.youtube.com/watch?v=dtCZMge7oHQ
+## [Video tutorial: https://www.youtube.com/watch?v=dtCZMge7oHQ](https://www.youtube.com/watch?v=dtCZMge7oHQ)
 
 # Icons:
 
@@ -118,8 +118,6 @@ Some themes bring an underlay and an overlay (Anemone effects). Turn on **Icon e
 
 If something doesn't look right, try **Rebuild icons** first. **Diagnostics** in Settings shows what happened and can be copied to share.
 
-Wow, you read the whole thing or did you scroll al the way down here, any ways  here's the MC movie in a gif:
+Wow, you read the whole thing or did you scroll al the way down here, any ways  here's [the MC movie in a gif](https://github.com/pizzasdu83/ressources/releases/download/Tryingsomething/MCgif.gif)
 
-![MC](https://github.com/pizzasdu83/ressources/releases/download/Tryingsomething/MCgif.gif)
-
-> This may takes a lot of time to load, since it's stored online...
+> This may takes a lot of time to load, since it's stored online and it’s a big file (~50Mo)...
