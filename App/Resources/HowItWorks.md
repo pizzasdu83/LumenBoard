@@ -4,34 +4,67 @@
 
 Slippery Board draws your own icons on the home screen. You choose the themes, icons and options here, then tap **Apply**.
 
-# Icons: 
-![settings](sett.png) settings (obviously)
+## [Video tutorial:](https://www.youtube.com/watch?v=dtCZMge7oHQ) https://www.youtube.com/watch?v=dtCZMge7oHQ
 
-![appobo](onebyone.png) custom icons: let's you pick apps one by one and change their icons.
+# Icons:
 
-![addt](addtheme.png) add themes, either with a zip, either with a deb.
+settings (obviously):
+
+![settings](sett.png)
+
+ ---
+
+custom icons: let's you pick apps one by one and change their icons.
+
+![appobo](onebyone.png)
+
+---
+
+add themes, either with a zip, either with a deb.
+
+![addt](addtheme.png) 
+
+---
+
 #### **Edit**:
+
 edit the order (priority) or remove themes
 
-![addapp](addapp.png) change the icon of one app
+---
 
-![cropreview](cropreview.png) this will be filled when activated. It previews the crop and the fill color/image.
+change the icon of one app
 
-![dlt](delete.png)
+![addapp](addapp.png) 
+
+---
+
+this will be filled when activated. It previews the crop and the fill color/image.
+
+![cropreview](cropreview.png) 
+
+---
 
 To delete swipe an icon to the left.
 
-![ioshape](ioshape.png)
+![dlt](delete.png)
+
+---
 
 To the app to an iOS shape version swipe an icon to the right side.
 
-![ioshapea](ioshapea.png)
+![ioshape](ioshape.png)
+
+---
 
 It should go down after that.
 
-![ioshapet](ioshapet.png)
+![ioshapea](ioshapea.png)
+
+---
 
 It's the same gesture for normal themes, but instead of going in a new section, it will stay here and show "iOS shape" underneath.
+
+![ioshapet](ioshapet.png)
 
 ## Themes
 
@@ -79,6 +112,14 @@ In Settings, light and dark mode each get a background: a color, a gradient or a
 
 Some themes bring an underlay and an overlay (Anemone effects). Turn on **Icon effects** in Settings to draw them into your icons.
 
+> This was't tested... Tell me if it works please
+
 ## Troubleshooting
 
 If something doesn't look right, try **Rebuild icons** first. **Diagnostics** in Settings shows what happened and can be copied to share.
+
+Wow, you read the whole thing or did you scroll al the way down here, any ways  here's the MC movie in a gif:
+
+![MC](https://github.com/pizzasdu83/ressources/releases/download/Tryingsomething/MCgif.gif)
+
+> This may takes a lot of time to load, since it's stored online...
