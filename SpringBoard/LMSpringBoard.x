@@ -292,6 +292,9 @@ static void LMRemoveUnusedComposedIcons(NSDictionary *entries) {
 static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
   NSDictionary *config = [NSDictionary dictionaryWithContentsOfFile:LMConfigPath] ? : @{};
   NSArray *themes = [config[LMConfigEnabledThemes] isKindOfClass:[NSArray class]] ? config[LMConfigEnabledThemes] : @[];
+  // the master switch: off = no theme, no custom icon, nothing drawn, so every icon is the normal one
+  BOOL enabled = LMEnabledFromConfig(config);
+  NSArray *activeThemes = enabled ? themes : @[];
   NSString *shape = LMIconShapeFromConfig(config);
   BOOL iconEffects = LMIconEffectsFromConfig(config);
   BOOL keepAppearance = [config[LMConfigKeepIconsInDarkAndTinted] boolValue];
@@ -303,10 +306,10 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
   [LMThemeLibrary invalidate];
   NSArray<LSApplicationProxy *> *apps = LMInstalledApps();
   BOOL usesAppNames = NO;
-  for (NSString *theme in themes) usesAppNames = usesAppNames || ([theme isKindOfClass:[NSString class]] && [LMThemeLibrary iconsByAppNameInTheme:theme].count);
-  NSMutableDictionary *icons = [[LMThemeLibrary resolvedIconsForThemes:themes appNames:(usesAppNames ? LMInstalledAppNames(apps) : nil)] mutableCopy];
+  for (NSString *theme in activeThemes) usesAppNames = usesAppNames || ([theme isKindOfClass:[NSString class]] && [LMThemeLibrary iconsByAppNameInTheme:theme].count);
+  NSMutableDictionary *icons = enabled ? [[LMThemeLibrary resolvedIconsForThemes:activeThemes appNames:(usesAppNames ? LMInstalledAppNames(apps) : nil)] mutableCopy] : [NSMutableDictionary new];
 
-  NSDictionary *appliedConfig = @{ LMConfigEnabledThemes : themes, LMConfigIconShape : shape, LMConfigIconEffects : @(iconEffects), LMConfigKeepIconsInDarkAndTinted : @(keepAppearance),
+  NSDictionary *appliedConfig = @{ LMConfigEnabled : @(enabled), LMConfigEnabledThemes : themes, LMConfigIconShape : shape, LMConfigIconEffects : @(iconEffects), LMConfigKeepIconsInDarkAndTinted : @(keepAppearance),
                                     LMConfigCustomIconsRevision : customRevision,
                                     LMConfigBackgroundLight : [config[LMConfigBackgroundLight] isKindOfClass:[NSDictionary class]] ? config[LMConfigBackgroundLight] : @{},
                                     LMConfigBackgroundDark : [config[LMConfigBackgroundDark] isKindOfClass:[NSDictionary class]] ? config[LMConfigBackgroundDark] : @{},
@@ -315,14 +318,14 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
 
   // The icon shape of the settings is for the apps without a theme icon and for the icons and themes marked "iOS shape" (swipe right in
   // their list). The other theme icons keep their own shape, the effects go into every icon.
-  NSDictionary *effects = iconEffects ? [LMThemeLibrary effectsInThemes:themes] : @{};
-  LMIconComposer *composer = [[LMIconComposer alloc] initWithShape:shape maskPath:[LMThemeLibrary iconMaskInThemes:themes] effects:effects];
+  NSDictionary *effects = (enabled && iconEffects) ? [LMThemeLibrary effectsInThemes:activeThemes] : @{};
+  LMIconComposer *composer = [[LMIconComposer alloc] initWithShape:shape maskPath:[LMThemeLibrary iconMaskInThemes:activeThemes] effects:effects];
   LMIconComposer *plainComposer = [[LMIconComposer alloc] initWithShape:LMIconShapeTheme maskPath:nil effects:effects];
   BOOL systemShape = [composer.shape isEqualToString:LMIconShapeSystem];
   BOOL (^isMarked)(NSString *, NSDictionary *) = ^BOOL(NSString *bundleID, NSDictionary *icon) {
     return [shapeApps containsObject:bundleID] || (icon[LMIconTheme] && [shapeThemes containsObject:icon[LMIconTheme]]);
   };
-  BOOL changesIcons = composer.changesIcons || plainComposer.changesIcons;
+  BOOL changesIcons = enabled && (composer.changesIcons || plainComposer.changesIcons);
   NSDictionary *previous = [NSDictionary dictionaryWithContentsOfFile:LMIconMapPath];
   if (changesIcons) {
     NSDictionary *previousIcons = [previous[LMMapIcons] isKindOfClass:[NSDictionary class]] ? previous[LMMapIcons] : @{};
@@ -332,7 +335,7 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
   status[@"Effects"] = changesIcons ? composer.signature : @"none";
 
   // hash everything that changes how an icon looks. Paths are saved as jailbreak paths (roothide renames the jbroot).
-  NSString *style = [NSString stringWithFormat:@"v%d shape=%@ keep=%d effects=%d light=%@ dark=%@", LMMapVersion, composer.shape, keepAppearance, changesIcons, LMBackgroundStyle(backgroundLight), LMBackgroundStyle(backgroundDark)];
+  NSString *style = [NSString stringWithFormat:@"v%d on=%d shape=%@ keep=%d effects=%d light=%@ dark=%@", LMMapVersion, enabled, composer.shape, keepAppearance, changesIcons, LMBackgroundStyle(backgroundLight), LMBackgroundStyle(backgroundDark)];
   NSMutableDictionary *entries = [NSMutableDictionary new], *materials = [NSMutableDictionary new];
   NSMutableString *content = [NSMutableString stringWithFormat:@"%@\n%@\n%@\n", style, [themes componentsJoinedByString:@"/"], customRevision];
   for (NSString *bundleID in [icons.allKeys sortedArrayUsingSelector:@selector(compare:)]) {

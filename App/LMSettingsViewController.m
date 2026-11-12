@@ -6,11 +6,13 @@
 #import "LMConfigStore.h"
 
 typedef NS_ENUM(NSInteger, LMSettingsSection) {
+  LMSettingsSectionEnabled,
   LMSettingsSectionIcons,
   LMSettingsSectionBackground,
   LMSettingsSectionIconCache,
   LMSettingsSectionTroubleshooting,
   LMSettingsSectionAbout,
+  LMSettingsSectionLinks,
   LMSettingsSectionCount,
 };
 
@@ -48,6 +50,27 @@ typedef NS_ENUM(NSInteger, LMIconsRow) {
 
 // With "On/Off Labels" (Settings > Accessibility) UISwitch draws its I/O labels through CoreImage, which crashes in
 // this process on some devices (CIContext falls back to OpenGL). The rows get a checkmark instead then.
+// The pictures the Slippery tweaks share (package com.pizzasdu83.slipperyassets). Without the package the rows get a symbol instead.
+static UIImage *LMSharedIcon(NSString *name, NSString *fallbackSymbol) {
+  static NSBundle *bundle;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    bundle = [NSBundle bundleWithPath:LMRootPath(@"/Library/Application Support/SlipperyAssets.bundle")];
+  });
+  UIImage *image = bundle ? [UIImage imageNamed:name inBundle:bundle compatibleWithTraitCollection:nil] : nil;
+  return image ? : [UIImage systemImageNamed:fallbackSymbol];
+}
+
+// title, picture, symbol if the picture is missing, address
+static NSArray<NSArray<NSString *> *> *LMLinks(void) {
+  return @[
+    @[LMLocalized(@"Source Code"), @"github", @"chevron.left.forwardslash.chevron.right", @"https://github.com/pizzasdu83/LumenBoard"],
+    @[LMLocalized(@"The original project"), @"github", @"chevron.left.forwardslash.chevron.right", @"https://github.com/xsxs18-dev/LumenBoard"],
+    @[LMLocalized(@"More"), @"vibin", @"ellipsis.circle", @"https://youtu.be/dtCZMge7oHQ"],
+    @[LMLocalized(@"Address me on discord"), @"discord", @"bubble.left.and.bubble.right", @"https://discord.gg/cHuKAXeQ7W"],
+  ];
+}
+
 static BOOL LMUseCheckmarksForToggles(void) {
   return UIAccessibilityIsOnOffSwitchLabelsEnabled();
 }
@@ -70,6 +93,15 @@ static BOOL LMUseCheckmarksForToggles(void) {
   UIAlertController *alert = [UIAlertController alertControllerWithTitle:LMLocalized(@"Couldn't save") message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:LMLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
   [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)setEnabled:(BOOL)on {
+  [LMConfigStore sharedStore].enabled = on;
+  [self save];
+}
+
+- (void)enabledChanged:(UISwitch *)toggle {
+  [self setEnabled:toggle.on];
 }
 
 - (void)setIconEffects:(BOOL)on {
@@ -107,11 +139,13 @@ static BOOL LMUseCheckmarksForToggles(void) {
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
   switch (section) {
+    case LMSettingsSectionEnabled: return 1;
     case LMSettingsSectionIcons: return LMIconsRowCount;
     case LMSettingsSectionBackground: return 2;
     case LMSettingsSectionIconCache: return 1;
     case LMSettingsSectionTroubleshooting: return 1;
     case LMSettingsSectionAbout: return 2;
+    case LMSettingsSectionLinks: return 4;
   }
   return 0;
 }
@@ -129,6 +163,7 @@ static BOOL LMUseCheckmarksForToggles(void) {
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
   switch (section) {
+    case LMSettingsSectionEnabled: return LMLocalized(@"Turn it off to get your normal icons back after you tap Apply. Your themes, icons and settings are kept.");
     case LMSettingsSectionIcons: return LMLocalized(@"The icon shape is for the apps your themes have no icon for and for the icons and themes marked \"iOS shape\" (swipe right in their list). The other theme icons keep their own shape. Icon effects are the underlays and overlays some themes bring along (Anemone effects), they are drawn into every app icon. Tap Apply afterwards.");
     case LMSettingsSectionBackground: return LMLocalized(@"Fills the transparent parts of the icons marked \"iOS shape\", inside their icon shape. It does not work with the icon shape \"Theme's own shape\". Light and dark mode each have their own background. Tap Apply afterwards.");
     case LMSettingsSectionIconCache: return LMLocalized(@"Rebuild icons deletes the icon cache of iOS and respring. Use it if icons still look wrong after installing or updating themes.");
@@ -143,7 +178,18 @@ static BOOL LMUseCheckmarksForToggles(void) {
   LMConfigStore *config = [LMConfigStore sharedStore];
   cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
-  if (indexPath.section == LMSettingsSectionIcons && indexPath.row == LMIconsRowShape) {
+  if (indexPath.section == LMSettingsSectionEnabled) {
+    content.text = LMLocalized(@"Enable Slippery Board");
+    content.image = [UIImage systemImageNamed:@"power"];
+    [self setToggleInCell:cell value:config.enabled action:@selector(enabledChanged:)];
+  } else if (indexPath.section == LMSettingsSectionLinks) {
+    NSArray<NSString *> *link = LMLinks()[indexPath.row];
+    content.text = link[0];
+    content.image = LMSharedIcon(link[1], link[2]);
+    content.imageProperties.maximumSize = CGSizeMake(29, 29);
+    content.imageProperties.reservedLayoutSize = CGSizeMake(29, 29);
+    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+  } else if (indexPath.section == LMSettingsSectionIcons && indexPath.row == LMIconsRowShape) {
     content = [UIListContentConfiguration valueCellConfiguration];
     content.text = LMLocalized(@"Icon shape");
     content.secondaryText = [LMShapeViewController nameForShape:config.iconShape];
@@ -194,6 +240,18 @@ static BOOL LMUseCheckmarksForToggles(void) {
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
   [tableView deselectRowAtIndexPath:indexPath animated:YES];
   LMConfigStore *config = [LMConfigStore sharedStore];
+  if (indexPath.section == LMSettingsSectionEnabled) {
+    // only selectable when the toggles are checkmarks
+    if (!LMUseCheckmarksForToggles()) return;
+    [self setEnabled:!config.enabled];
+    [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+    return;
+  }
+  if (indexPath.section == LMSettingsSectionLinks) {
+    NSURL *url = [NSURL URLWithString:LMLinks()[indexPath.row][3]];
+    if (url) [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    return;
+  }
   if (indexPath.section == LMSettingsSectionIcons) {
     switch (indexPath.row) {
       case LMIconsRowShape:

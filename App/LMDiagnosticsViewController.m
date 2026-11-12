@@ -157,6 +157,7 @@ static NSString *LMDiagnosticsReport(void) {
     [report appendFormat:@"      theme: %@\n", LMFolderSummary(directory)];
     for (NSString *folder in @[@"IconBundles", @"Icons"]) [report appendFormat:@"      %@: %@\n", folder, LMFolderSummary([directory stringByAppendingPathComponent:folder])];
   }
+  [report appendFormat:@"  Slippery Board switch: %@\n", config.enabled ? @"on" : @"OFF"];
   [report appendFormat:@"  icon shape: %@, icon effects: %@, keep in dark & tinted: %@\n", config.iconShape, LMYesNo(config.iconEffects), LMYesNo(config.keepIconsInDarkAndTinted)];
   NSDictionary *effects = [LMThemeLibrary effectsInThemes:config.enabledThemes];
   NSString *mask = [LMThemeLibrary iconMaskInThemes:config.enabledThemes];

@@ -26,6 +26,7 @@ static NSArray<NSString *> *LMNormalizedList(NSArray<NSString *> *list, BOOL low
     NSDictionary *config = [NSDictionary dictionaryWithContentsOfFile:LMConfigPath] ? : @{};
     NSArray *themes = config[LMConfigEnabledThemes];
     _enabledThemes = [themes isKindOfClass:[NSArray class]] ? [themes copy] : @[];
+    _enabled = LMEnabledFromConfig(config);
     _iconShape = LMIconShapeFromConfig(config);
     _iconEffects = LMIconEffectsFromConfig(config);
     _keepIconsInDarkAndTinted = [config[LMConfigKeepIconsInDarkAndTinted] boolValue];
@@ -54,6 +55,7 @@ static NSArray<NSString *> *LMNormalizedList(NSArray<NSString *> *list, BOOL low
   NSArray *shapeApps = [config[LMConfigShapeApps] isKindOfClass:[NSArray class]] ? config[LMConfigShapeApps] : @[];
   NSArray *shapeThemes = [config[LMConfigShapeThemes] isKindOfClass:[NSArray class]] ? config[LMConfigShapeThemes] : @[];
   return @{
+    LMConfigEnabled : @(LMEnabledFromConfig(config)),
     LMConfigEnabledThemes : themes,
     LMConfigIconShape : LMIconShapeFromConfig(config),
     LMConfigIconEffects : @(LMIconEffectsFromConfig(config)),
@@ -68,6 +70,7 @@ static NSArray<NSString *> *LMNormalizedList(NSArray<NSString *> *list, BOOL low
 
 - (NSDictionary *)dictionaryRepresentation {
   return @{
+    LMConfigEnabled : @(_enabled),
     LMConfigEnabledThemes : _enabledThemes ? : @[],
     LMConfigIconShape : _iconShape ? : LMIconShapeSystem,
     LMConfigIconEffects : @(_iconEffects),

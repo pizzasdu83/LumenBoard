@@ -6,6 +6,8 @@ NS_ASSUME_NONNULL_BEGIN
 @interface LMConfigStore : NSObject
 
 + (instancetype)sharedStore;
+// the master switch: off = every icon is the normal one after the next Apply. On by default.
+@property (nonatomic) BOOL enabled;
 // theme folder names, highest priority first
 @property (nonatomic, copy) NSArray<NSString *> *enabledThemes;
 // LMIconShape*
