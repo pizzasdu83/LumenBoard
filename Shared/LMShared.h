@@ -68,6 +68,7 @@ static inline NSString *LMJailbreakPath(NSString *path) {
 #define LMConfigBackgroundLight @"BackgroundLight"
 #define LMConfigBackgroundDark @"BackgroundDark"
 #define LMMapBackground @"Background" // in the icon map: { Light: {...}, Dark: {...} }, Image is a jailbreak path there
+#define LMConfigEnabled @"Enabled" // the master switch, on unless the config says NO
 #define LMConfigShapeApps @"IOSShapeApps" // lowercased bundle ids whose icon gets the iOS icon shape, even if the setting is off
 #define LMConfigShapeThemes @"IOSShapeThemes" // theme folder names whose icons all get the iOS icon shape
 
@@ -119,6 +120,12 @@ static inline BOOL LMIconEffectsFromConfig(NSDictionary *config) {
 static inline NSString *LMBackgroundSignature(NSDictionary *background) {
   if (![background isKindOfClass:[NSDictionary class]]) return @"-";
   return [NSString stringWithFormat:@"%@,%@,%@,%@,%@", background[@"Mode"] ? : @"", background[@"Color"] ? : @"", background[@"Color2"] ? : @"", background[@"Angle"] ? : @"", background[@"Image"] ? : @""];
+}
+
+// the master switch of Slippery Board: on by default and for configs that don't know it
+static inline BOOL LMEnabledFromConfig(NSDictionary *config) {
+  id value = config[LMConfigEnabled];
+  return [value isKindOfClass:[NSNumber class]] ? [value boolValue] : YES;
 }
 
 // the folder where iOS keeps the rendered app icons
