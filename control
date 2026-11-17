@@ -1,6 +1,6 @@
-Package: com.xsxs18.lumenboard
+Package: com.pizzasdu83.slipperyboard
 Name: Slippery Board
-Version: 1.8.0
+Version: 1.8.1
 Architecture: iphoneos-arm64
 Description: Icon theme engine for iOS 17 - 26. Works with SnowBoard, Anemone and WinterBoard themes.
 Maintainer: xsxs18-dev
@@ -9,4 +9,4 @@ Section: Tweaks
 Depends: mobilesubstrate, firmware (>= 17.0)
 Provides: com.spark.snowboard, com.anemonetheming.anemone, winterboard
 Conflicts: com.spark.snowboard, com.anemonetheming.anemone, winterboard, com.artikus.neonboard, com.xsxs18.neonboard, com.xsxs18.avalanche, com.xsxs18.lumen
-Replaces: com.xsxs18.avalanche, com.xsxs18.lumen
+Replaces: com.xsxs18.avalanche, com.xsxs18.lumen, com.xsxs18.lumenboard
