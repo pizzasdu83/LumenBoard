@@ -7,6 +7,7 @@
 #import <objc/message.h>
 #import <mach-o/dyld.h>
 #import <dlfcn.h>
+#import <sys/stat.h>
 #import <stdatomic.h>
 #import <ImageIO/ImageIO.h>
 #import <CommonCrypto/CommonDigest.h>
@@ -338,6 +339,21 @@ static void LMClassifyRequest(id descriptor, long long appearance, long long var
   *dark = (appearance == 1);
 }
 
+// the theme's png for this request: dark, or tinted / clear (light or dark). nil if the theme has none.
+static NSString *LMVariantForRequest(NSDictionary *entry, BOOL dark, int style, NSString **slotOut) {
+  NSArray *chain;
+  if (style == 1) chain = dark ? @[LMIconTintedDark, LMIconTinted, LMIconTintedLight] : @[LMIconTintedLight, LMIconTinted, LMIconTintedDark];
+  else if (style == 2) chain = dark ? @[LMIconClearDark, LMIconClearLight, LMIconTinted] : @[LMIconClearLight, LMIconClearDark, LMIconTinted];
+  else chain = dark ? @[LMIconDark] : @[];
+  for (NSString *slot in chain) {
+    if ([entry[slot] isKindOfClass:[NSString class]]) {
+      if (slotOut) *slotOut = slot;
+      return entry[slot];
+    }
+  }
+  return nil;
+}
+
 // written to the report once per kind of request
 static void LMLogDescriptor(id descriptor, long long appearance, long long variant, BOOL dark, int style, NSString *chosen) {
   static NSMutableSet *seen;
@@ -365,22 +381,8 @@ static void LMProviderConfigure(ISResourceProvider *self, SEL _cmd, id descripto
   BOOL dark = NO;
   int style = 0;
   LMClassifyRequest(descriptor, appearance, appearanceVariant, &dark, &style);
-  NSString *variant = nil, *chosenSlot = nil;
-  if (style) {
-    NSArray *chain;
-    if (style == 1) chain = dark ? @[LMIconTintedDark, LMIconTinted, LMIconTintedLight] : @[LMIconTintedLight, LMIconTinted, LMIconTintedDark];
-    else chain = dark ? @[LMIconClearDark, LMIconClearLight, LMIconTinted] : @[LMIconClearLight, LMIconClearDark, LMIconTinted];
-    for (NSString *slot in chain) {
-      if ([entry[slot] isKindOfClass:[NSString class]]) {
-        variant = entry[slot];
-        chosenSlot = slot;
-        break;
-      }
-    }
-  } else if (dark) {
-    variant = entry[LMIconDark];
-    if (variant) chosenSlot = LMIconDark;
-  }
+  NSString *chosenSlot = nil;
+  NSString *variant = LMVariantForRequest(entry, dark, style, &chosenSlot);
   // light and dark mode have their own background, tinted and clear icons have none
   NSDictionary *background = style ? nil : LMBackgroundForEntry(entry, appearance);
   // no dark icon, but a dark background: the normal icon goes over it
@@ -405,6 +407,146 @@ static void LMProviderConfigure(ISResourceProvider *self, SEL _cmd, id descripto
   }
   struct objc_super superclass = { self, class_getSuperclass(LMProviderClass) };
   ((void (*)(struct objc_super *, SEL, id))objc_msgSendSuper)(&superclass, _cmd, descriptor);
+}
+
+#pragma mark - Tinted and clear icons, drawn here
+
+// iOS 26 tinted and clear icons: what IconServices draws is what the home screen shows, and for themed icons it came out empty.
+// So the finished icon is drawn here: the theme's png at the size asked for, with the iOS shape if the request wants it.
+static NSCache *LMOwnImages;
+
+static NSString *LMOwnFileStamp(NSString *path) {
+  struct stat info;
+  if (stat(path.fileSystemRepresentation, &info) != 0) return @"0";
+  return [NSString stringWithFormat:@"%ld.%ld", (long)info.st_mtimespec.tv_sec, (long)info.st_size];
+}
+
+static BOOL LMTintFromDescriptor(id descriptor, CGFloat rgb[3]) {
+  static NSRegularExpression *expression;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{ expression = [NSRegularExpression regularExpressionWithPattern:@"\\bt:([0-9.]+):([0-9.]+):([0-9.]+):([0-9.]+)" options:0 error:nil]; });
+  NSString *text = [descriptor description];
+  NSTextCheckingResult *match = text.length ? [expression firstMatchInString:text options:0 range:NSMakeRange(0, text.length)] : nil;
+  if (!match || match.numberOfRanges < 5) return NO;
+  for (int i = 0; i < 3; i++) rgb[i] = [[text substringWithRange:[match rangeAtIndex:i + 1]] doubleValue];
+  return [[text substringWithRange:[match rangeAtIndex:4]] doubleValue] > 0.01;
+}
+
+static CGImageRef LMCreateArtwork(NSString *path) {
+  CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path isDirectory:NO], NULL);
+  if (!source) return NULL;
+  NSDictionary *options = @{
+    (__bridge id)kCGImageSourceCreateThumbnailFromImageAlways : @YES,
+    (__bridge id)kCGImageSourceCreateThumbnailWithTransform : @YES,
+    (__bridge id)kCGImageSourceThumbnailMaxPixelSize : @(LMMaxArtworkPixels),
+  };
+  CGImageRef image = CGImageSourceGetCount(source) ? CGImageSourceCreateThumbnailAtIndex(source, 0, (__bridge CFDictionaryRef)options) : NULL;
+  CFRelease(source);
+  return image;
+}
+
+// nil: not a tinted or clear request for a themed icon, iOS does it
+static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
+  NSString *bundleIdentifier = LMThemedIconIdentifier(icon);
+  if (!bundleIdentifier || LMRenderingStock || !descriptor) return nil;
+  long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
+  long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
+  BOOL dark = NO;
+  int style = 0;
+  LMClassifyRequest(descriptor, appearance, variant, &dark, &style);
+  if (!style) return nil;
+  NSDictionary *entry = [[LMIconStore sharedStore] iconForBundleIdentifier:bundleIdentifier];
+  if (!entry) return nil;
+
+  NSString *slot = nil;
+  NSString *path = LMVariantForRequest(entry, dark, style, &slot);
+  // the theme's own TintedLight/Dark and ClearLight/Dark are finished icons. A gray one (-tinted, or made from the dark/normal icon) gets the tint color here.
+  BOOL colorize = NO, overBlack = NO;
+  if (!path) {
+    if ([LMIconStore sharedStore].keepsIconsInDarkAndTinted) return nil;
+    path = entry[LMIconDark] ? : entry[LMIconLight];
+    slot = @"grayscale";
+    colorize = YES;
+    overBlack = YES;
+  } else if ([slot isEqualToString:LMIconTinted]) {
+    colorize = YES;
+  }
+  if (![path isKindOfClass:[NSString class]]) return nil;
+
+  CGSize size = [descriptor respondsToSelector:@selector(size)] ? ((CGSize (*)(id, SEL))objc_msgSend)(descriptor, @selector(size)) : CGSizeZero;
+  double scale = [descriptor respondsToSelector:@selector(scale)] ? ((double (*)(id, SEL))objc_msgSend)(descriptor, @selector(scale)) : 0;
+  if (scale <= 0) scale = 2;
+  size_t width = (size_t)ceil(size.width * scale), height = (size_t)ceil(size.height * scale);
+  if (!width || !height || width > 2048 || height > 2048) return nil;
+  BOOL masked = [descriptor respondsToSelector:@selector(shouldApplyMask)] ? ((BOOL (*)(id, SEL))objc_msgSend)(descriptor, @selector(shouldApplyMask)) : NO;
+  CGFloat tint[3] = { 0, 0, 0 };
+  BOOL hasTint = style == 1 && colorize && LMTintFromDescriptor(descriptor, tint);
+
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    LMOwnImages = [NSCache new];
+    LMOwnImages.countLimit = 200;
+  });
+  NSString *key = [NSString stringWithFormat:@"%@|%zux%zu|%@|%d%d%d%d|%d|%.3f,%.3f,%.3f", path, width, height, LMOwnFileStamp(path), masked, colorize, overBlack, dark, style, tint[0], tint[1], tint[2]];
+  IFImage *cached = [LMOwnImages objectForKey:key];
+  if (cached) return cached;
+
+  CGImageRef artwork = LMCreateArtwork(path);
+  if (!artwork) return nil;
+  CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  CGContextRef context = CGBitmapContextCreate(NULL, width, height, 8, 0, space, kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+  CGColorSpaceRelease(space);
+  if (!context) {
+    CGImageRelease(artwork);
+    return nil;
+  }
+  CGRect rect = CGRectMake(0, 0, width, height);
+  if (masked) {
+    CGFloat radius = MIN(width, height) * 0.2237;
+    CGPathRef shape = CGPathCreateWithRoundedRect(rect, radius, radius, NULL);
+    CGContextAddPath(context, shape);
+    CGContextClip(context);
+    CGPathRelease(shape);
+  }
+  if (overBlack) {
+    CGContextSetRGBFillColor(context, 0, 0, 0, 1);
+    CGContextFillRect(context, rect);
+  }
+  CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
+  double factor = MAX(width / (double)CGImageGetWidth(artwork), height / (double)CGImageGetHeight(artwork));
+  double drawnWidth = CGImageGetWidth(artwork) * factor, drawnHeight = CGImageGetHeight(artwork) * factor;
+  CGContextDrawImage(context, CGRectMake((width - drawnWidth) / 2, (height - drawnHeight) / 2, drawnWidth, drawnHeight), artwork);
+  CGImageRelease(artwork);
+
+  if (colorize || style == 2) {
+    uint8_t *data = CGBitmapContextGetData(context);
+    size_t stride = CGBitmapContextGetBytesPerRow(context);
+    // tinted dark: the tint on black. Tinted light: the tint, lightened. Clear: just gray.
+    CGFloat multiplier[3] = { 1, 1, 1 };
+    if (hasTint) for (int i = 0; i < 3; i++) multiplier[i] = dark ? tint[i] : 0.5 * tint[i] + 0.5;
+    if (data && colorize) {
+      for (size_t y = 0; y < height; y++) {
+        uint8_t *row = data + y * stride;
+        for (size_t x = 0; x < width; x++) {
+          uint8_t *pixel = row + x * 4; // B, G, R, A (premultiplied)
+          double gray = (pixel[2] * 77 + pixel[1] * 151 + pixel[0] * 28) / 256.0;
+          if (gray > pixel[3]) gray = pixel[3];
+          pixel[0] = (uint8_t)(gray * multiplier[2]);
+          pixel[1] = (uint8_t)(gray * multiplier[1]);
+          pixel[2] = (uint8_t)(gray * multiplier[0]);
+        }
+      }
+    }
+  }
+  CGImageRef result = CGBitmapContextCreateImage(context);
+  CGContextRelease(context);
+  if (!result) return nil;
+  IFImage *image = [[objc_getClass("IFImage") alloc] initWithCGImage:result scale:scale];
+  CGImageRelease(result);
+  if (!image) return nil;
+  [LMOwnImages setObject:image forKey:key cost:width * height * 4];
+  LMLogDescriptor(descriptor, appearance, variant, dark, style, [@"own: " stringByAppendingString:slot ? : @"?"]);
+  return image;
 }
 
 // LMThemeIconRecipe: app icon recipe without the mask
@@ -574,6 +716,8 @@ static void LMMapDidChange(CFNotificationCenterRef center, void *observer, CFStr
 
 - (id)generateImageWithDescriptor:(id)descriptor {
   if (!LMThemedIconIdentifier(self)) return %orig;
+  IFImage *own = LMOwnTintedImage(self, descriptor);
+  if (own) return own;
   IFImage *image = nil;
   if (atomic_load(&LMAgentRendersThemes)) {
     image = %orig;
@@ -595,6 +739,11 @@ static void LMMapDidChange(CFNotificationCenterRef center, void *observer, CFStr
   }
   ISConcreteIcon *icon = self;
   id request = [descriptor copy];
+  IFImage *own = LMOwnTintedImage(self, descriptor);
+  if (own) {
+    completion(own);
+    return;
+  }
   void (^checked)(id) = ^(id image) {
     if (LMRenderedWithTheme(image)) {
       LMStatusCount(LMCounterAgentThemed);
