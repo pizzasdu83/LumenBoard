@@ -52,7 +52,7 @@ static void LMMapChanged(CFNotificationCenterRef center, void *observer, CFStrin
   if (valid) [map[LMMapIcons] enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSDictionary *entry, BOOL *stop) {
     if (![entry isKindOfClass:[NSDictionary class]]) return;
     NSMutableDictionary *icon = [entry mutableCopy];
-    for (NSString *slot in @[LMIconLight, LMIconDark, LMIconTinted])
+    for (NSString *slot in LMIconAllSlots)
       if ([entry[slot] isKindOfClass:[NSString class]]) icon[slot] = LMRootPath(entry[slot]);
     icons[bundleID] = icon;
   }];

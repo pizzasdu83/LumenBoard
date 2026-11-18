@@ -326,22 +326,78 @@ static NSDictionary *LMBackgroundForEntry(NSDictionary *entry, long long appeara
   return [[LMIconStore sharedStore] backgroundForAppearance:appearance];
 }
 
-// LMThemeIconProvider: use the theme's -dark / -tinted png if there is one
+// what iOS asks for: dark or not, and the style (0 normal, 1 tinted, 2 clear). iOS 26 names: Light, Dark, ClearLight, ClearDark, TintedLight, TintedDark.
+// The numbers behind them are not documented, so the words in the descriptor count too. The report shows what was asked and what was chosen.
+static void LMClassifyRequest(id descriptor, long long appearance, long long variant, BOOL *dark, int *style) {
+  NSString *text = [descriptor description].lowercaseString ? : @"";
+  int kind = 0;
+  if ([text containsString:@"clear"]) kind = 2;
+  else if ([text containsString:@"tint"]) kind = 1;
+  else if (appearance == 2 || variant != 0) kind = 1;
+  else if (appearance == 3) kind = 2;
+  *style = kind;
+  *dark = (appearance == 1);
+}
+
+// written to the report once per kind of request
+static void LMLogDescriptor(id descriptor, long long appearance, long long variant, BOOL dark, int style, NSString *chosen) {
+  static NSMutableSet *seen;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{ seen = [NSMutableSet new]; });
+  NSString *key = [NSString stringWithFormat:@"%lld/%lld/%d/%d/%@", appearance, variant, dark, style, chosen ? : @"-"];
+  BOOL isNew = NO;
+  @synchronized (seen) {
+    if (![seen containsObject:key] && seen.count < 12) {
+      [seen addObject:key];
+      isNew = YES;
+    }
+  }
+  if (!isNew) return;
+  NSString *text = [[descriptor description] stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
+  if (text.length > 220) text = [text substringToIndex:220];
+  LMStatusEvent(@"asked appearance=%lld variant=%lld (dark=%d style=%d) -> %@: %@", appearance, variant, dark, style, chosen ? : @"fallback", text);
+}
+
+// LMThemeIconProvider: use the theme's -dark / -tinted / -clear... png if there is one
 static void LMProviderConfigure(ISResourceProvider *self, SEL _cmd, id descriptor) {
   NSDictionary *entry = objc_getAssociatedObject(self, &LMIconEntryKey);
   long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
-  NSString *variant = (appearance == 1) ? entry[LMIconDark] : ((appearance == 2) ? entry[LMIconTinted] : nil);
-  // light and dark mode have their own background, tinted icons have none
-  NSDictionary *background = LMBackgroundForEntry(entry, appearance);
+  long long appearanceVariant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
+  BOOL dark = NO;
+  int style = 0;
+  LMClassifyRequest(descriptor, appearance, appearanceVariant, &dark, &style);
+  NSString *variant = nil, *chosenSlot = nil;
+  if (style) {
+    NSArray *chain;
+    if (style == 1) chain = dark ? @[LMIconTintedDark, LMIconTinted, LMIconTintedLight] : @[LMIconTintedLight, LMIconTinted, LMIconTintedDark];
+    else chain = dark ? @[LMIconClearDark, LMIconClearLight, LMIconTinted] : @[LMIconClearLight, LMIconClearDark, LMIconTinted];
+    for (NSString *slot in chain) {
+      if ([entry[slot] isKindOfClass:[NSString class]]) {
+        variant = entry[slot];
+        chosenSlot = slot;
+        break;
+      }
+    }
+  } else if (dark) {
+    variant = entry[LMIconDark];
+    if (variant) chosenSlot = LMIconDark;
+  }
+  // light and dark mode have their own background, tinted and clear icons have none
+  NSDictionary *background = style ? nil : LMBackgroundForEntry(entry, appearance);
   // no dark icon, but a dark background: the normal icon goes over it
-  if (!variant && appearance == 1 && background) variant = entry[LMIconLight];
-  // tinted mode and the theme has no tinted icon: iOS can't derive one from the normal icon and the icon would be blank.
+  if (!variant && !style && dark && background) {
+    variant = entry[LMIconLight];
+    chosenSlot = @"Light+background";
+  }
+  // tinted or clear mode and the theme has no icon for it: iOS can't derive one from the normal icon and the icon would be blank.
   // Make one from the dark (or normal) icon instead, in grayscale like a real tinted icon.
   int tintable = 0;
-  if (!variant && appearance == 2 && ![LMIconStore sharedStore].keepsIconsInDarkAndTinted) {
+  if (!variant && style && ![LMIconStore sharedStore].keepsIconsInDarkAndTinted) {
     variant = entry[LMIconDark] ? : entry[LMIconLight];
     tintable = LMEntryIsMasked(entry) ? 2 : 1;
+    chosenSlot = @"grayscale";
   }
+  LMLogDescriptor(descriptor, appearance, appearanceVariant, dark, style, chosenSlot);
   id bag = LMImageBag(variant, background, tintable);
   if (bag) {
     [self setIconResource:bag];
