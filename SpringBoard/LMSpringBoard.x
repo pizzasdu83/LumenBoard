@@ -204,7 +204,7 @@ static void LMComposeIcons(NSMutableDictionary<NSString *, NSDictionary *> *icon
       if (icon[LMIconTheme]) entry[LMIconTheme] = icon[LMIconTheme]; // the shape can be set for a whole theme
       // what to draw: slot, artwork png, background
       NSMutableArray<NSArray *> *jobs = [NSMutableArray new];
-      for (NSString *slot in @[LMIconLight, LMIconDark, LMIconTinted]) {
+      for (NSString *slot in LMIconAllSlots) {
         if (!icon[slot]) continue;
         NSDictionary *background = !bakesBackground ? nil : ([slot isEqualToString:LMIconLight] ? backgroundLight : ([slot isEqualToString:LMIconDark] ? backgroundDark : nil));
         [jobs addObject:@[slot, icon[slot], background ? : (id)[NSNull null]]];
@@ -282,7 +282,7 @@ static void LMComposeIcons(NSMutableDictionary<NSString *, NSDictionary *> *icon
 static void LMRemoveUnusedComposedIcons(NSDictionary *entries) {
   NSMutableSet *used = [NSMutableSet new];
   for (NSDictionary *entry in entries.allValues)
-    for (NSString *slot in @[LMIconLight, LMIconDark, LMIconTinted])
+    for (NSString *slot in LMIconAllSlots)
       if ([entry[slot] isKindOfClass:[NSString class]]) [used addObject:[entry[slot] lastPathComponent]];
   for (NSString *file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:LMComposedDirectory error:nil])
     if (![used containsObject:file]) [[NSFileManager defaultManager] removeItemAtPath:[LMComposedDirectory stringByAppendingPathComponent:file] error:nil];
@@ -342,7 +342,7 @@ static BOOL LMWriteIconMap(BOOL composeIcons, NSMutableDictionary *status) {
     NSDictionary *icon = icons[bundleID];
     NSMutableDictionary *entry = [NSMutableDictionary new];
     NSMutableString *material = [bundleID mutableCopy];
-    for (NSString *slot in @[LMIconLight, LMIconDark, LMIconTinted]) {
+    for (NSString *slot in LMIconAllSlots) {
       if (icon[slot]) entry[slot] = LMJailbreakPath(icon[slot]);
       [material appendFormat:@"|%@@%@", entry[slot] ? : @"", LMFileStamp(icon[slot])];
     }
