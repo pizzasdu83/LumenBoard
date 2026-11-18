@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.1
+- Fixed icons not appearing in clear mode
+- Changed pakage name to com.pizzasdu83.slipperyboard
+
 ## 1.8.0
 - New: a master switch "Enable Slippery Board" at the top of Settings (on by default). Off + Apply: every icon is back to normal, themes, icons and settings are kept
 - New: links in Settings (source code, the original project, more, discord) with the pictures of Slippery Assets (package com.pizzasdu83.slipperyassets), a symbol instead if the package is not installed
