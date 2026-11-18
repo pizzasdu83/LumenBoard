@@ -329,12 +329,11 @@ static NSDictionary *LMBackgroundForEntry(NSDictionary *entry, long long appeara
 // what iOS asks for: dark or not, and the style (0 normal, 1 tinted, 2 clear). iOS 26 names: Light, Dark, ClearLight, ClearDark, TintedLight, TintedDark.
 // The numbers behind them are not documented, so the words in the descriptor count too. The report shows what was asked and what was chosen.
 static void LMClassifyRequest(id descriptor, long long appearance, long long variant, BOOL *dark, int *style) {
-  NSString *text = [descriptor description].lowercaseString ? : @"";
+  // seen on iOS 26.0: variant 0 = normal (appearance 0 light / 1 dark), 2 = tinted (the descriptor carries the tint color), 3 = clear
   int kind = 0;
-  if ([text containsString:@"clear"]) kind = 2;
-  else if ([text containsString:@"tint"]) kind = 1;
-  else if (appearance == 2 || variant != 0) kind = 1;
-  else if (appearance == 3) kind = 2;
+  if (variant == 3) kind = 2;
+  else if (variant != 0) kind = 1;
+  else if (appearance == 2) kind = 1;
   *style = kind;
   *dark = (appearance == 1);
 }
@@ -401,8 +400,8 @@ static void LMProviderConfigure(ISResourceProvider *self, SEL _cmd, id descripto
   id bag = LMImageBag(variant, background, tintable);
   if (bag) {
     [self setIconResource:bag];
-    // the theme drew this appearance itself, don't let iOS derive it again
-    if ([self respondsToSelector:@selector(setAllowAlterationsToResourceArt:)]) [self setAllowAlterationsToResourceArt:NO];
+    // the theme drew dark itself, don't let iOS derive it again. Tinted and clear: iOS puts the tint color / the glass on the theme's gray icon
+    if ([self respondsToSelector:@selector(setAllowAlterationsToResourceArt:)]) [self setAllowAlterationsToResourceArt:style ? YES : NO];
   }
   struct objc_super superclass = { self, class_getSuperclass(LMProviderClass) };
   ((void (*)(struct objc_super *, SEL, id))objc_msgSendSuper)(&superclass, _cmd, descriptor);
