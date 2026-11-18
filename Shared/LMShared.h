@@ -104,7 +104,12 @@ static inline BOOL LMIconEffectsFromConfig(NSDictionary *config) {
 #define LMMapIcons @"Icons" // lowercased bundle id -> icon
 #define LMIconLight @"Light"
 #define LMIconDark @"Dark"
-#define LMIconTinted @"Tinted"
+#define LMIconTinted @"Tinted" // "-tinted": older themes, one tinted icon
+#define LMIconClearLight @"ClearLight" // iOS 26: "-ClearLight", "-ClearDark", "-TintedLight", "-TintedDark"
+#define LMIconClearDark @"ClearDark"
+#define LMIconTintedLight @"TintedLight"
+#define LMIconTintedDark @"TintedDark"
+#define LMIconAllSlots @[LMIconLight, LMIconDark, LMIconTinted, LMIconClearLight, LMIconClearDark, LMIconTintedLight, LMIconTintedDark]
 #define LMIconToken @"Token" // changes whenever the icon or the settings change
 #define LMIconTheme @"Theme" // only while resolving: the theme folder an icon comes from, not in the icon map
 #define LMIconSystemShape @"SystemShape" // YES: iOS applies its mask. Missing in maps before 1.1.0, then the map's UseSystemIconShape counts

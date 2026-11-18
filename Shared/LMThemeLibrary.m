@@ -4,7 +4,7 @@
 
 // What a file name tells about an icon, e.g. "com.apple.MobileSMS-large@3x~iphone.png".
 typedef struct {
-  NSInteger appearance; // 0 light, 1 dark, 2 tinted
+  NSInteger appearance; // index in LMIconAllSlots: 0 light, 1 dark, 2 tinted, 3 clear light, 4 clear dark, 5 tinted light, 6 tinted dark
   NSInteger rank;       // higher wins: matching device, then "-large", then scale
 } LMIconFileTraits;
 
@@ -24,7 +24,7 @@ static NSString *LMTrailingSuffix(NSString *name) {
   static NSArray<NSString *> *suffixes;
   static dispatch_once_t once;
   dispatch_once(&once, ^{
-    suffixes = @[@"-large", @"-dark", @"-tinted", @"@1x", @"@2x", @"@3x", @"~iphone", @"~ipad"];
+    suffixes = @[@"-large", @"-dark", @"-tinted", @"-clearlight", @"-cleardark", @"-tintedlight", @"-tinteddark", @"@1x", @"@2x", @"@3x", @"~iphone", @"~ipad"];
   });
   for (NSString *suffix in suffixes)
     if (name.length > suffix.length && [name hasSuffix:suffix]) return suffix;
@@ -42,6 +42,10 @@ static NSString *LMIconNameForFile(NSString *file, LMIconFileTraits *traits) {
     if ([suffix isEqualToString:@"-large"]) large = 1;
     else if ([suffix isEqualToString:@"-dark"]) appearance = 1;
     else if ([suffix isEqualToString:@"-tinted"]) appearance = 2;
+    else if ([suffix isEqualToString:@"-clearlight"]) appearance = 3;
+    else if ([suffix isEqualToString:@"-cleardark"]) appearance = 4;
+    else if ([suffix isEqualToString:@"-tintedlight"]) appearance = 5;
+    else if ([suffix isEqualToString:@"-tinteddark"]) appearance = 6;
     else if ([suffix isEqualToString:@"~iphone"]) device = pad ? 0 : 2;
     else if ([suffix isEqualToString:@"~ipad"]) device = pad ? 2 : 0;
     else scale = [suffix characterAtIndex:1] - '0';
@@ -138,7 +142,7 @@ static NSString *const LMCustomIconsCacheKey = @"\n/CustomIcons"; // can't clash
     LMIconFileTraits traits;
     NSString *name = LMIconNameForFile(file, &traits);
     if (!name) continue;
-    NSString *slot = @[LMIconLight, LMIconDark, LMIconTinted][traits.appearance];
+    NSString *slot = LMIconAllSlots[traits.appearance];
     NSString *rankKey = [NSString stringWithFormat:@"%@\n%@", name, slot];
     NSNumber *best = ranks[rankKey];
     if (best && best.integerValue >= traits.rank) continue;
