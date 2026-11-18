@@ -231,10 +231,45 @@ static CGImageRef LMCreateImageOverBackground(CGImageRef icon, NSDictionary *bac
   return result;
 }
 
+// a tinted-looking version of an icon: grayscale (iOS puts the tint color on it), over black where iOS masks the icon
+// itself. Returns a new image, NULL if it can't be drawn.
+static CGImageRef LMCreateTintableImage(CGImageRef icon, BOOL overBlack) {
+  size_t width = CGImageGetWidth(icon), height = CGImageGetHeight(icon);
+  if (!width || !height) return NULL;
+  CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  CGContextRef context = CGBitmapContextCreate(NULL, width, height, 8, 0, space, kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+  CGColorSpaceRelease(space);
+  if (!context) return NULL;
+  CGRect rect = CGRectMake(0, 0, width, height);
+  if (overBlack) {
+    CGContextSetRGBFillColor(context, 0, 0, 0, 1);
+    CGContextFillRect(context, rect);
+  }
+  CGContextDrawImage(context, rect, icon);
+  uint8_t *data = CGBitmapContextGetData(context);
+  size_t stride = CGBitmapContextGetBytesPerRow(context);
+  if (data) {
+    for (size_t y = 0; y < height; y++) {
+      uint8_t *row = data + y * stride;
+      for (size_t x = 0; x < width; x++) {
+        uint8_t *pixel = row + x * 4; // B, G, R, A (premultiplied)
+        uint8_t gray = (uint8_t)((pixel[2] * 77 + pixel[1] * 151 + pixel[0] * 28) >> 8);
+        if (gray > pixel[3]) gray = pixel[3];
+        pixel[0] = pixel[1] = pixel[2] = gray;
+      }
+    }
+  }
+  CGImageRef result = CGBitmapContextCreateImage(context);
+  CGContextRelease(context);
+  return result;
+}
+
 // background: goes behind the icon (nil: the icon as it is)
-static id LMImageBag(NSString *path, NSDictionary *background) {
+// tintable: 0 = as it is, 1 = grayscale for tinted mode, 2 = grayscale over black (for icons iOS masks itself)
+static id LMImageBag(NSString *path, NSDictionary *background, int tintable) {
   if (!path.length) return nil;
   NSString *key = background ? [NSString stringWithFormat:@"%@\n%@", path, LMBackgroundSignature(background)] : path;
+  if (tintable) key = [key stringByAppendingFormat:@"\ntint%d", tintable];
   id bag = [LMImageBags objectForKey:key];
   if (bag) return bag;
 
@@ -256,6 +291,14 @@ static id LMImageBag(NSString *path, NSDictionary *background) {
     if (composed) {
       CGImageRelease(image);
       image = composed;
+    }
+  }
+
+  if (tintable) {
+    CGImageRef gray = LMCreateTintableImage(image, tintable == 2);
+    if (gray) {
+      CGImageRelease(image);
+      image = gray;
     }
   }
 
@@ -292,7 +335,14 @@ static void LMProviderConfigure(ISResourceProvider *self, SEL _cmd, id descripto
   NSDictionary *background = LMBackgroundForEntry(entry, appearance);
   // no dark icon, but a dark background: the normal icon goes over it
   if (!variant && appearance == 1 && background) variant = entry[LMIconLight];
-  id bag = LMImageBag(variant, background);
+  // tinted mode and the theme has no tinted icon: iOS can't derive one from the normal icon and the icon would be blank.
+  // Make one from the dark (or normal) icon instead, in grayscale like a real tinted icon.
+  int tintable = 0;
+  if (!variant && appearance == 2 && ![LMIconStore sharedStore].keepsIconsInDarkAndTinted) {
+    variant = entry[LMIconDark] ? : entry[LMIconLight];
+    tintable = LMEntryIsMasked(entry) ? 2 : 1;
+  }
+  id bag = LMImageBag(variant, background, tintable);
   if (bag) {
     [self setIconResource:bag];
     // the theme drew this appearance itself, don't let iOS derive it again
@@ -317,7 +367,7 @@ static id LMRecipePrimaryEffect(id self, SEL _cmd, id __autoreleasing *backgroun
 
 static ISResourceProvider *LMMakeProvider(NSDictionary *entry) {
   LMIconStore *store = [LMIconStore sharedStore];
-  id bag = LMImageBag(entry[LMIconLight], LMBackgroundForEntry(entry, 0));
+  id bag = LMImageBag(entry[LMIconLight], LMBackgroundForEntry(entry, 0), 0);
   if (!bag) {
     LMStatusCount(LMCounterUnreadableImages);
     if (LMStatusCounterValue(LMCounterUnreadableImages) <= 5) LMStatusEvent(@"can't load %@", entry[LMIconLight]);
