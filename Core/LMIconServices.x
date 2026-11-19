@@ -468,10 +468,21 @@ static CGImageRef LMCreateArtwork(NSString *path) {
   return image;
 }
 
+// TEST BUILD: tinted and clear are handled differently per app, to find out why themed icons stay empty
+//   com.apple.calculator: a plain magenta square   com.apple.camera: IconServices draws it (theme provider)
+//   com.apple.findmy: the stock icon, no theme     everything else (App Store...): drawn here
+static BOOL LMTestStock(ISConcreteIcon *icon, id descriptor) {
+  if (![LMThemedIconIdentifier(icon) isEqualToString:@"com.apple.findmy"] || !descriptor) return NO;
+  long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
+  return variant == 2 || variant == 3;
+}
+
 // nil: not a tinted or clear request for a themed icon, iOS does it
 static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
   NSString *bundleIdentifier = LMThemedIconIdentifier(icon);
   if (!bundleIdentifier || LMRenderingStock || !descriptor) return nil;
+  BOOL testSolid = [bundleIdentifier isEqualToString:@"com.apple.calculator"];
+  if ([bundleIdentifier isEqualToString:@"com.apple.camera"]) return nil;
   long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
   long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
   BOOL dark = NO;
@@ -510,7 +521,7 @@ static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
     LMOwnImages = [NSCache new];
     LMOwnImages.countLimit = 200;
   });
-  NSString *key = [NSString stringWithFormat:@"%@|%zux%zu|%@|%d%d%d%d|%d|%.3f,%.3f,%.3f", path, width, height, LMOwnFileStamp(path), masked, colorize, overBlack, dark, style, tint[0], tint[1], tint[2]];
+  NSString *key = [NSString stringWithFormat:@"%d|%@|%zux%zu|%@|%d%d%d%d|%d|%.3f,%.3f,%.3f", testSolid, path, width, height, LMOwnFileStamp(path), masked, colorize, overBlack, dark, style, tint[0], tint[1], tint[2]];
   IFImage *cached = [LMOwnImages objectForKey:key];
   if (cached) return cached;
 
@@ -538,10 +549,15 @@ static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
   CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
   double factor = MAX(width / (double)CGImageGetWidth(artwork), height / (double)CGImageGetHeight(artwork));
   double drawnWidth = CGImageGetWidth(artwork) * factor, drawnHeight = CGImageGetHeight(artwork) * factor;
-  CGContextDrawImage(context, CGRectMake((width - drawnWidth) / 2, (height - drawnHeight) / 2, drawnWidth, drawnHeight), artwork);
+  if (testSolid) {
+    CGContextSetRGBFillColor(context, 1, 0, 1, 1);
+    CGContextFillRect(context, rect);
+  } else {
+    CGContextDrawImage(context, CGRectMake((width - drawnWidth) / 2, (height - drawnHeight) / 2, drawnWidth, drawnHeight), artwork);
+  }
   CGImageRelease(artwork);
 
-  if (colorize || style == 2) {
+  if (!testSolid && (colorize || style == 2)) {
     uint8_t *data = CGBitmapContextGetData(context);
     size_t stride = CGBitmapContextGetBytesPerRow(context);
     // tinted dark: the tint on black. Tinted light: the tint, lightened. Clear: just gray.
@@ -572,7 +588,7 @@ static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
     dispatch_once(&reported, ^{ LMStatusEvent(@"couldn't give the validation token to a tinted/clear icon, it may stay empty"); });
   }
   [LMOwnImages setObject:image forKey:key cost:width * height * 4];
-  LMLogDescriptor(descriptor, appearance, variant, dark, style, [@"own: " stringByAppendingString:slot ? : @"?"]);
+  LMLogDescriptor(descriptor, appearance, variant, dark, style, [NSString stringWithFormat:@"own(%@): %@", bundleIdentifier, slot ? : @"?"]);
   return image;
 }
 
@@ -742,7 +758,7 @@ static void LMMapDidChange(CFNotificationCenterRef center, void *observer, CFStr
 }
 
 - (id)generateImageWithDescriptor:(id)descriptor {
-  if (!LMThemedIconIdentifier(self)) return %orig;
+  if (!LMThemedIconIdentifier(self) || LMTestStock(self, descriptor)) return %orig;
   IFImage *own = LMOwnTintedImage(self, descriptor);
   if (own) return own;
   IFImage *image = nil;
@@ -760,7 +776,7 @@ static void LMMapDidChange(CFNotificationCenterRef center, void *observer, CFStr
 }
 
 - (void)generateImageWithDescriptor:(id)descriptor completion:(void (^)(id image))completion {
-  if (!LMThemedIconIdentifier(self) || !completion) {
+  if (!LMThemedIconIdentifier(self) || !completion || LMTestStock(self, descriptor)) {
     %orig;
     return;
   }
