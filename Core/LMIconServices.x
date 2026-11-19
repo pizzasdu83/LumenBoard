@@ -472,23 +472,18 @@ static CGImageRef LMCreateArtwork(NSString *path) {
 static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor);
 
 // TEST BUILD: tinted and clear are handled differently per app, to find out why themed icons stay empty
-//   com.apple.calculator: a plain magenta square   com.apple.camera: IconServices draws it (theme provider)
-//   com.apple.findmy: the stock icon, no theme     everything else (App Store...): drawn here
+// tinted and clear: the image comes from iconservicesagent (iOS accepts that), our picture is put inside it
 static BOOL LMTestStock(ISConcreteIcon *icon, id descriptor) {
-  if (![LMThemedIconIdentifier(icon) isEqualToString:@"com.apple.findmy"] || !descriptor) return NO;
+  if (!LMThemedIconIdentifier(icon) || LMRenderingStock || !descriptor) return NO;
   long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
-  if (variant != 2 && variant != 3) return NO;
-  static dispatch_once_t once;
-  dispatch_once(&once, ^{ LMStatusEvent(@"test: com.apple.findmy asked for tinted/clear, giving the stock icon"); });
-  return YES;
+  return variant == 2 || variant == 3;
 }
 
 // nil: not a tinted or clear request for a themed icon, iOS does it
 static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
   NSString *bundleIdentifier = LMThemedIconIdentifier(icon);
   if (!bundleIdentifier || LMRenderingStock || !descriptor) return nil;
-  BOOL testSolid = [bundleIdentifier isEqualToString:@"com.apple.calculator"];
-  if ([bundleIdentifier isEqualToString:@"com.apple.camera"]) return nil;
+  BOOL testSolid = NO;
   long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
   long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
   BOOL dark = NO;
@@ -602,7 +597,13 @@ static void LMLogImage(NSString *label, IFImage *image) {
   CGColorSpaceRef space = cg ? CGImageGetColorSpace(cg) : NULL;
   NSString *spaceName = space ? CFBridgingRelease(CGColorSpaceCopyName(space)) : nil;
   double scale = [image respondsToSelector:@selector(scale)] ? ((double (*)(id, SEL))objc_msgSend)(image, @selector(scale)) : 0;
-  LMStatusEvent(@"%@: %@ cg=%zux%zu bpc=%zu info=0x%x space=%@ scale=%.1f token=%lu", label, NSStringFromClass([image class]), cg ? CGImageGetWidth(cg) : 0, cg ? CGImageGetHeight(cg) : 0, cg ? CGImageGetBitsPerComponent(cg) : 0, cg ? (unsigned)CGImageGetBitmapInfo(cg) : 0, spaceName ? : @"-", scale, (unsigned long)token.length);
+  NSMutableString *extra = [NSMutableString new];
+  for (NSString *name in @[@"_data", @"_layerData", @"_ICRIconLayer", @"_finalizedIcon", @"_CALayer", @"_catalog"]) {
+    Ivar ivar = class_getInstanceVariable([image class], name.UTF8String);
+    id value = ivar ? object_getIvar(image, ivar) : nil;
+    [extra appendFormat:@" %@=%@", [name substringFromIndex:1], !ivar ? @"n/a" : (!value ? @"nil" : ([value isKindOfClass:[NSData class]] ? [NSString stringWithFormat:@"%lub", (unsigned long)[(NSData *)value length]] : @"set"))];
+  }
+  LMStatusEvent(@"%@: %@ cg=%zux%zu bpc=%zu info=0x%x space=%@ scale=%.1f token=%lu%@", label, NSStringFromClass([image class]), cg ? CGImageGetWidth(cg) : 0, cg ? CGImageGetHeight(cg) : 0, cg ? CGImageGetBitsPerComponent(cg) : 0, cg ? (unsigned)CGImageGetBitmapInfo(cg) : 0, spaceName ? : @"-", scale, (unsigned long)token.length, extra);
 }
 
 static BOOL LMSwapCGImage(IFImage *image, CGImageRef replacement) {
@@ -635,7 +636,7 @@ static BOOL LMSwapCGImage(IFImage *image, CGImageRef replacement) {
 }
 
 static IFImage *LMTestSwap(ISConcreteIcon *icon, id descriptor, IFImage *stock) {
-  if (!stock) return stock;
+  if (!stock) return LMOwnTintedImage(icon, descriptor);
   static int reports;
   BOOL report = reports < 2;
   if (report) LMLogImage(@"stock tinted/clear from the agent", stock);
