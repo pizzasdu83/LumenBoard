@@ -654,6 +654,8 @@ static IFImage *LMTestSwap(ISConcreteIcon *icon, id descriptor, IFImage *stock) 
   BOOL swapped = NO;
   if (stock && cg) swapped = LMSwapCGImage(stock, cg);
   if (trace) LMStatusEvent(@"deliver %@: agent image %@, ours %@, swapped %@", traceKey, stock ? @"yes" : @"no", cg ? @"yes" : @"no", swapped ? @"yes" : @"no");
+  static int imageLogged;
+  if (trace && stock && imageLogged++ < 1) LMLogImage(@"agent image", stock);
   if (!stock) return own;
   return stock;
 }
