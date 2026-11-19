@@ -41,6 +41,7 @@
 @end
 
 @interface IFImage : NSObject
+- (double)scale;
 - (instancetype)initWithCGImage:(CGImageRef)image scale:(double)scale;
 - (NSData *)validationToken;
 - (CGImageRef)CGImage;
@@ -362,7 +363,7 @@ static void LMLogDescriptor(id descriptor, long long appearance, long long varia
   NSString *key = [NSString stringWithFormat:@"%lld/%lld/%d/%d/%@", appearance, variant, dark, style, chosen ? : @"-"];
   BOOL isNew = NO;
   @synchronized (seen) {
-    if (![seen containsObject:key] && seen.count < 12) {
+    if (![seen containsObject:key] && seen.count < 60) {
       [seen addObject:key];
       isNew = YES;
     }
@@ -468,13 +469,18 @@ static CGImageRef LMCreateArtwork(NSString *path) {
   return image;
 }
 
+static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor);
+
 // TEST BUILD: tinted and clear are handled differently per app, to find out why themed icons stay empty
 //   com.apple.calculator: a plain magenta square   com.apple.camera: IconServices draws it (theme provider)
 //   com.apple.findmy: the stock icon, no theme     everything else (App Store...): drawn here
 static BOOL LMTestStock(ISConcreteIcon *icon, id descriptor) {
   if (![LMThemedIconIdentifier(icon) isEqualToString:@"com.apple.findmy"] || !descriptor) return NO;
   long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
-  return variant == 2 || variant == 3;
+  if (variant != 2 && variant != 3) return NO;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{ LMStatusEvent(@"test: com.apple.findmy asked for tinted/clear, giving the stock icon"); });
+  return YES;
 }
 
 // nil: not a tinted or clear request for a themed icon, iOS does it
@@ -583,13 +589,64 @@ static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
   IFImage *image = [[objc_getClass("IFImage") alloc] initWithCGImage:result scale:scale];
   CGImageRelease(result);
   if (!image) return nil;
-  if (!LMGiveValidationToken(image)) {
-    static dispatch_once_t reported;
-    dispatch_once(&reported, ^{ LMStatusEvent(@"couldn't give the validation token to a tinted/clear icon, it may stay empty"); });
-  }
+  LMGiveValidationToken(image);
   [LMOwnImages setObject:image forKey:key cost:width * height * 4];
-  LMLogDescriptor(descriptor, appearance, variant, dark, style, [NSString stringWithFormat:@"own(%@): %@", bundleIdentifier, slot ? : @"?"]);
+  LMLogDescriptor(descriptor, appearance, variant, dark, style, [@"own: " stringByAppendingString:slot ? : @"?"]);
   return image;
+}
+
+// TEST: what an IFImage from iconservicesagent looks like, and putting our picture inside one
+static void LMLogImage(NSString *label, IFImage *image) {
+  CGImageRef cg = [image respondsToSelector:@selector(CGImage)] ? [image CGImage] : NULL;
+  NSData *token = [image respondsToSelector:@selector(validationToken)] ? [image validationToken] : nil;
+  CGColorSpaceRef space = cg ? CGImageGetColorSpace(cg) : NULL;
+  NSString *spaceName = space ? CFBridgingRelease(CGColorSpaceCopyName(space)) : nil;
+  double scale = [image respondsToSelector:@selector(scale)] ? ((double (*)(id, SEL))objc_msgSend)(image, @selector(scale)) : 0;
+  LMStatusEvent(@"%@: %@ cg=%zux%zu bpc=%zu info=0x%x space=%@ scale=%.1f token=%lu", label, NSStringFromClass([image class]), cg ? CGImageGetWidth(cg) : 0, cg ? CGImageGetHeight(cg) : 0, cg ? CGImageGetBitsPerComponent(cg) : 0, cg ? (unsigned)CGImageGetBitmapInfo(cg) : 0, spaceName ? : @"-", scale, (unsigned long)token.length);
+}
+
+static BOOL LMSwapCGImage(IFImage *image, CGImageRef replacement) {
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    NSMutableArray *names = [NSMutableArray new];
+    for (Class c = [image class]; c && c != [NSObject class]; c = class_getSuperclass(c)) {
+      unsigned count = 0;
+      Ivar *list = class_copyIvarList(c, &count);
+      for (unsigned i = 0; i < count; i++) [names addObject:[NSString stringWithFormat:@"%s(%s)", ivar_getName(list[i]), ivar_getTypeEncoding(list[i]) ? : "?"]];
+      free(list);
+    }
+    LMStatusEvent(@"IFImage ivars: %@", [names componentsJoinedByString:@" "]);
+  });
+  for (Class c = [image class]; c && c != [NSObject class]; c = class_getSuperclass(c)) {
+    unsigned count = 0;
+    Ivar *list = class_copyIvarList(c, &count);
+    for (unsigned i = 0; i < count; i++) {
+      const char *type = ivar_getTypeEncoding(list[i]);
+      if (type && strncmp(type, "^{CGImage", 9) == 0) {
+        CGImageRef *slot = (CGImageRef *)((uint8_t *)(__bridge void *)image + ivar_getOffset(list[i]));
+        *slot = CGImageRetain(replacement); // the old picture is left alone on purpose
+        free(list);
+        return YES;
+      }
+    }
+    free(list);
+  }
+  return NO;
+}
+
+static IFImage *LMTestSwap(ISConcreteIcon *icon, id descriptor, IFImage *stock) {
+  if (!stock) return stock;
+  static int reports;
+  BOOL report = reports < 2;
+  if (report) LMLogImage(@"stock tinted/clear from the agent", stock);
+  IFImage *own = LMOwnTintedImage(icon, descriptor);
+  CGImageRef cg = [own respondsToSelector:@selector(CGImage)] ? [own CGImage] : NULL;
+  if (!cg) return stock;
+  if (report) LMLogImage(@"ours", own);
+  BOOL swapped = LMSwapCGImage(stock, cg);
+  if (report) LMStatusEvent(@"put our picture into the agent's image: %@", swapped ? @"yes" : @"no, no CGImage ivar");
+  reports++;
+  return stock;
 }
 
 // LMThemeIconRecipe: app icon recipe without the mask
@@ -742,6 +799,23 @@ static void LMMapDidChange(CFNotificationCenterRef center, void *observer, CFStr
   if (!atomic_exchange(&LMAgentRendersThemes, true)) LMStatusSet(LMStatusAgentRendersThemes, @YES);
 }
 
+// TEST BUILD: what the store hands back for tinted/clear requests of the test apps (once per app and kind)
+static void LMLogStoreLookup(ISConcreteIcon *icon, id descriptor, IFImage *image) {
+  NSString *bundleIdentifier = LMThemedIconIdentifier(icon);
+  if (!bundleIdentifier || ![@[@"com.apple.calculator", @"com.apple.camera", @"com.apple.appstore", @"com.apple.findmy"] containsObject:bundleIdentifier]) return;
+  long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
+  if (variant != 2 && variant != 3) return;
+  static NSMutableSet *seen;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{ seen = [NSMutableSet new]; });
+  NSString *key = [NSString stringWithFormat:@"%@/%lld/%d", bundleIdentifier, variant, image ? 1 : 0];
+  @synchronized (seen) {
+    if ([seen containsObject:key]) return;
+    [seen addObject:key];
+  }
+  LMStatusEvent(@"store lookup %@ variant=%lld: %@", bundleIdentifier, variant, image ? (LMRenderedWithTheme(image) ? @"themed image" : @"stock image") : @"nothing");
+}
+
 #pragma mark - Hooks
 
 %group Icons
@@ -752,13 +826,15 @@ static void LMMapDidChange(CFNotificationCenterRef center, void *observer, CFStr
 // cached by an iconservicesagent without LumenBoard: the stock icon under the themed digest
 - (id)_imageFromStoreForDescriptor:(id)descriptor {
   IFImage *image = %orig;
+  LMLogStoreLookup(self, descriptor, image);
   if (!image || !LMThemedIconIdentifier(self) || LMRenderedWithTheme(image)) return image;
   LMAgentMissedTheme(self);
   return nil;
 }
 
 - (id)generateImageWithDescriptor:(id)descriptor {
-  if (!LMThemedIconIdentifier(self) || LMTestStock(self, descriptor)) return %orig;
+  if (!LMThemedIconIdentifier(self)) return %orig;
+  if (LMTestStock(self, descriptor)) return LMTestSwap(self, descriptor, %orig);
   IFImage *own = LMOwnTintedImage(self, descriptor);
   if (own) return own;
   IFImage *image = nil;
@@ -776,8 +852,14 @@ static void LMMapDidChange(CFNotificationCenterRef center, void *observer, CFStr
 }
 
 - (void)generateImageWithDescriptor:(id)descriptor completion:(void (^)(id image))completion {
-  if (!LMThemedIconIdentifier(self) || !completion || LMTestStock(self, descriptor)) {
+  if (!LMThemedIconIdentifier(self) || !completion) {
     %orig;
+    return;
+  }
+  if (LMTestStock(self, descriptor)) {
+    ISConcreteIcon *testIcon = self;
+    id testDescriptor = [descriptor copy];
+    %orig(descriptor, ^(id image) { completion(LMTestSwap(testIcon, testDescriptor, image)); });
     return;
   }
   ISConcreteIcon *icon = self;
