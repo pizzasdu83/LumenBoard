@@ -483,7 +483,7 @@ static BOOL LMTestStock(ISConcreteIcon *icon, id descriptor) {
 static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
   NSString *bundleIdentifier = LMThemedIconIdentifier(icon);
   if (!bundleIdentifier || LMRenderingStock || !descriptor) return nil;
-  BOOL testSolid = NO;
+  BOOL testSolid = [bundleIdentifier isEqualToString:@"com.apple.calculator"]; // TEST: magenta
   long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
   long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
   BOOL dark = NO;
@@ -636,17 +636,25 @@ static BOOL LMSwapCGImage(IFImage *image, CGImageRef replacement) {
 }
 
 static IFImage *LMTestSwap(ISConcreteIcon *icon, id descriptor, IFImage *stock) {
-  if (!stock) return LMOwnTintedImage(icon, descriptor);
-  static int reports;
-  BOOL report = reports < 2;
-  if (report) LMLogImage(@"stock tinted/clear from the agent", stock);
   IFImage *own = LMOwnTintedImage(icon, descriptor);
+  static NSMutableSet *traced;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{ traced = [NSMutableSet new]; });
+  long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
+  long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
+  NSString *traceKey = [NSString stringWithFormat:@"%@/%lld/%lld", LMThemedIconIdentifier(icon), appearance, variant];
+  BOOL trace = NO;
+  @synchronized (traced) {
+    if (![traced containsObject:traceKey] && traced.count < 14) {
+      [traced addObject:traceKey];
+      trace = YES;
+    }
+  }
   CGImageRef cg = [own respondsToSelector:@selector(CGImage)] ? [own CGImage] : NULL;
-  if (!cg) return stock;
-  if (report) LMLogImage(@"ours", own);
-  BOOL swapped = LMSwapCGImage(stock, cg);
-  if (report) LMStatusEvent(@"put our picture into the agent's image: %@", swapped ? @"yes" : @"no, no CGImage ivar");
-  reports++;
+  BOOL swapped = NO;
+  if (stock && cg) swapped = LMSwapCGImage(stock, cg);
+  if (trace) LMStatusEvent(@"deliver %@: agent image %@, ours %@, swapped %@", traceKey, stock ? @"yes" : @"no", cg ? @"yes" : @"no", swapped ? @"yes" : @"no");
+  if (!stock) return own;
   return stock;
 }
 
