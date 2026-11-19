@@ -411,6 +411,29 @@ static void LMProviderConfigure(ISResourceProvider *self, SEL _cmd, id descripto
 
 #pragma mark - Tinted and clear icons, drawn here
 
+static BOOL LMRenderedWithTheme(IFImage *image);
+
+// IconServices throws away an IFImage that has no validation token. Everything IconServices draws carries one, an image made here needs it too.
+static BOOL LMGiveValidationToken(IFImage *image) {
+  static NSData *token;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    SEL validToken = NSSelectorFromString(@"_is_validToken");
+    if ([NSData respondsToSelector:validToken]) token = ((NSData *(*)(Class, SEL))objc_msgSend)([NSData class], validToken);
+  });
+  if (!token.length || !image) return NO;
+  SEL setter = NSSelectorFromString(@"setValidationToken:");
+  if ([image respondsToSelector:setter]) {
+    ((void (*)(id, SEL, id))objc_msgSend)(image, setter, token);
+  } else {
+    Ivar ivar = class_getInstanceVariable([image class], "_validationToken");
+    if (ivar) object_setIvarWithStrongDefault(image, ivar, token);
+  }
+  return LMRenderedWithTheme(image);
+}
+
+
+
 // iOS 26 tinted and clear icons: what IconServices draws is what the home screen shows, and for themed icons it came out empty.
 // So the finished icon is drawn here: the theme's png at the size asked for, with the iOS shape if the request wants it.
 static NSCache *LMOwnImages;
@@ -544,6 +567,10 @@ static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
   IFImage *image = [[objc_getClass("IFImage") alloc] initWithCGImage:result scale:scale];
   CGImageRelease(result);
   if (!image) return nil;
+  if (!LMGiveValidationToken(image)) {
+    static dispatch_once_t reported;
+    dispatch_once(&reported, ^{ LMStatusEvent(@"couldn't give the validation token to a tinted/clear icon, it may stay empty"); });
+  }
   [LMOwnImages setObject:image forKey:key cost:width * height * 4];
   LMLogDescriptor(descriptor, appearance, variant, dark, style, [@"own: " stringByAppendingString:slot ? : @"?"]);
   return image;
