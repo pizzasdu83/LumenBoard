@@ -660,6 +660,16 @@ static IFImage *LMTestSwap(ISConcreteIcon *icon, id descriptor, IFImage *stock) 
   return stock;
 }
 
+// TEST: what iOS itself gives for a tinted or clear icon of an app that has no theme
+static void LMSampleStock(IFImage *image, id descriptor) {
+  static int samples;
+  if (!image || samples >= 3 || !descriptor) return;
+  long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
+  if (variant != 2 && variant != 3) return;
+  samples++;
+  LMLogImage([NSString stringWithFormat:@"app without theme, variant %lld", variant], image);
+}
+
 // LMThemeIconRecipe: app icon recipe without the mask
 static BOOL LMRecipeShouldApplyMask(id self, SEL _cmd) {
   return NO;
@@ -844,7 +854,11 @@ static void LMLogStoreLookup(ISConcreteIcon *icon, id descriptor, IFImage *image
 }
 
 - (id)generateImageWithDescriptor:(id)descriptor {
-  if (!LMThemedIconIdentifier(self)) return %orig;
+  if (!LMThemedIconIdentifier(self)) {
+    IFImage *plain = %orig;
+    LMSampleStock(plain, descriptor);
+    return plain;
+  }
   if (LMTestStock(self, descriptor)) return LMTestSwap(self, descriptor, %orig);
   IFImage *own = LMOwnTintedImage(self, descriptor);
   if (own) return own;
@@ -864,6 +878,14 @@ static void LMLogStoreLookup(ISConcreteIcon *icon, id descriptor, IFImage *image
 
 - (void)generateImageWithDescriptor:(id)descriptor completion:(void (^)(id image))completion {
   if (!LMThemedIconIdentifier(self) || !completion) {
+    if (completion && !LMThemedIconIdentifier(self)) {
+      id sampleDescriptor = [descriptor copy];
+      %orig(descriptor, ^(id image) {
+        LMSampleStock(image, sampleDescriptor);
+        completion(image);
+      });
+      return;
+    }
     %orig;
     return;
   }
