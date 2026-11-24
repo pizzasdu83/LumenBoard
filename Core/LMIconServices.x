@@ -42,6 +42,7 @@
 
 @interface IFImage : NSObject
 - (double)scale;
+- (void)setLayerData:(NSData *)layerData;
 - (instancetype)initWithCGImage:(CGImageRef)image scale:(double)scale;
 - (NSData *)validationToken;
 - (CGImageRef)CGImage;
@@ -635,6 +636,73 @@ static BOOL LMSwapCGImage(IFImage *image, CGImageRef replacement) {
   return NO;
 }
 
+// The layers iOS draws tinted and clear icons from ("layerData", a small asset catalog). iOS makes them for icons that are just one picture with its own
+// ISIconStackComposer; here it does the same with the theme's picture. The platform number is not documented, so the candidates are tried.
+static NSData *LMBuildLayerData(NSDictionary *entry, id descriptor, BOOL dark) {
+  static NSCache *cache;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    cache = [NSCache new];
+    cache.countLimit = 120;
+  });
+  Class composerClass = NSClassFromString(@"ISIconStackComposer");
+  if (!composerClass || !descriptor) return nil;
+  BOOL useDark = dark && [entry[LMIconDark] isKindOfClass:[NSString class]];
+  NSString *path = useDark ? entry[LMIconDark] : entry[LMIconLight];
+  if (![path isKindOfClass:[NSString class]]) return nil;
+  CGSize size = [descriptor respondsToSelector:@selector(size)] ? ((CGSize (*)(id, SEL))objc_msgSend)(descriptor, @selector(size)) : CGSizeZero;
+  double scale = [descriptor respondsToSelector:@selector(scale)] ? ((double (*)(id, SEL))objc_msgSend)(descriptor, @selector(scale)) : 2;
+  long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
+  long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
+  id tint = [descriptor respondsToSelector:@selector(tintColor)] ? ((id (*)(id, SEL))objc_msgSend)(descriptor, @selector(tintColor)) : nil;
+  if (size.width <= 0 || size.height <= 0) return nil;
+  NSString *key = [NSString stringWithFormat:@"%@|%@|%.1fx%.1f@%.1f|%lld|%lld|%@", path, LMOwnFileStamp(path), size.width, size.height, scale, appearance, variant, tint];
+  NSData *cached = [cache objectForKey:key];
+  if (cached) return cached;
+
+  CGImageRef art = LMCreateArtwork(path);
+  if (!art) return nil;
+  static long long workingPlatform = -1;
+  NSArray *candidates = workingPlatform >= 0 ? @[@(workingPlatform)] : @[@2, @1, @0, @3, @4, @5];
+  NSData *result = nil;
+  static int failures;
+  for (NSNumber *candidate in candidates) {
+    unsigned long long platform = candidate.unsignedLongLongValue;
+    NSString *stage = @"composer";
+    @try {
+      id composer = [composerClass alloc];
+      SEL initializer = @selector(initWithLegacyAsset:assetAppearance:platform:);
+      if (![composer respondsToSelector:initializer]) break;
+      composer = ((id (*)(id, SEL, CGImageRef, long long, unsigned long long))objc_msgSend)(composer, initializer, art, useDark ? 1 : 0, platform);
+      if (!composer) continue;
+      stage = @"stack";
+      __unsafe_unretained id report = nil;
+      id stack = ((id (*)(id, SEL, CGSize, double, long long, void *))objc_msgSend)(composer, @selector(iconStackForSize:scale:desiredAssetAppearance:returningGenerationReport:), size, scale, useDark ? 1 : 0, (void *)&report);
+      if (!stack) continue;
+      stage = @"finalized icon";
+      SEL finalize = @selector(_IF_finalizedIconWithSize:scale:platform:appearance:appearanceVariant:tintColor:isLegacy:);
+      if (![stack respondsToSelector:finalize]) break;
+      id finalized = ((id (*)(id, SEL, CGSize, long long, unsigned long long, long long, long long, id, BOOL))objc_msgSend)(stack, finalize, size, (long long)scale, platform, appearance, variant, tint, YES);
+      if (!finalized) continue;
+      stage = @"serialize";
+      __unsafe_unretained NSError *error = nil;
+      NSData *data = ((NSData *(*)(id, SEL, void *))objc_msgSend)(finalized, @selector(serializedDataWithError:), (void *)&error);
+      if (data.length > 500) {
+        result = data;
+        if (workingPlatform < 0) LMStatusEvent(@"layerData built with platform %llu: %lu bytes (%.0fx%.0f@%.0f, appearance %lld variant %lld)", platform, (unsigned long)data.length, size.width, size.height, scale, appearance, variant);
+        workingPlatform = (long long)platform;
+        break;
+      }
+    } @catch (NSException *exception) {
+      if (failures++ < 3) LMStatusEvent(@"layerData: exception at %@ (platform %llu): %@", stage, platform, exception.reason);
+    }
+  }
+  CGImageRelease(art);
+  if (!result && failures++ < 3) LMStatusEvent(@"layerData: nothing built for %@", path.lastPathComponent);
+  if (result) [cache setObject:result forKey:key cost:result.length];
+  return result;
+}
+
 static IFImage *LMTestSwap(ISConcreteIcon *icon, id descriptor, IFImage *stock) {
   IFImage *own = LMOwnTintedImage(icon, descriptor);
   static NSMutableSet *traced;
@@ -653,7 +721,17 @@ static IFImage *LMTestSwap(ISConcreteIcon *icon, id descriptor, IFImage *stock) 
   CGImageRef cg = [own respondsToSelector:@selector(CGImage)] ? [own CGImage] : NULL;
   BOOL swapped = NO;
   if (stock && cg) swapped = LMSwapCGImage(stock, cg);
-  if (trace) LMStatusEvent(@"deliver %@: agent image %@, ours %@, swapped %@", traceKey, stock ? @"yes" : @"no", cg ? @"yes" : @"no", swapped ? @"yes" : @"no");
+  // the layers iOS draws tinted/clear from
+  BOOL dark = (appearance == 1);
+  NSDictionary *entry = [[LMIconStore sharedStore] iconForBundleIdentifier:LMThemedIconIdentifier(icon)];
+  NSData *layers = entry ? LMBuildLayerData(entry, descriptor, dark) : nil;
+  IFImage *target = stock ? : own;
+  BOOL layered = NO;
+  if (layers && [target respondsToSelector:@selector(setLayerData:)]) {
+    ((void (*)(id, SEL, id))objc_msgSend)(target, @selector(setLayerData:), layers);
+    layered = YES;
+  }
+  if (trace) LMStatusEvent(@"deliver %@: agent image %@, ours %@, swapped %@, layers %@", traceKey, stock ? @"yes" : @"no", cg ? @"yes" : @"no", swapped ? @"yes" : @"no", layered ? [NSString stringWithFormat:@"%luB", (unsigned long)layers.length] : @"no");
   static int imageLogged;
   if (trace && stock && imageLogged++ < 1) LMLogImage(@"agent image", stock);
   if (!stock) return own;
@@ -768,7 +846,7 @@ static void LMDumpICRClasses(void) {
     [report writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
     LMStatusEvent(@"saved %lu IconServices/ICR classes in Dumps/classes.txt (%lu bytes)", (unsigned long)names.count, (unsigned long)report.length);
     LMDumpImageClasses(@"ICRFinalizedIcon", @"framework-icr.txt", @[]);
-    LMDumpImageClasses(@"ISIconLayerGroup", @"framework-iconservices.txt", @[@"Icon", @"Layer", @"Compos", @"Render", @"Final", @"Serial", @"Recipe", @"Stack"]);
+    LMDumpImageClasses(@"ISIconLayerGroup", @"framework-iconservices.txt", @[@"Icon", @"Layer", @"Compos", @"Render", @"Final", @"Serial", @"Recipe", @"Stack", @"Platform", @"Device"]);
     LMDumpImageClasses(@"CUINamedIconLayerStack", @"framework-coreui.txt", @[@"Icon", @"Layer", @"Stack", @"Storage", @"Mutable", @"Rendition"]);
   });
 }
