@@ -699,6 +699,45 @@ static NSString *LMDescribeLayerData(NSData *data) {
   return text;
 }
 
+// every class of the framework that holds an anchor class (ICR = the glass/tint renderer), with its methods. Written to Dumps/<file>.
+static void LMDumpImageClasses(NSString *anchor, NSString *file, NSArray<NSString *> *keywords) {
+  Class anchorClass = NSClassFromString(anchor);
+  const char *image = anchorClass ? class_getImageName(anchorClass) : NULL;
+  if (!image) {
+    LMStatusEvent(@"%@: class not found", anchor);
+    return;
+  }
+  unsigned count = 0;
+  const char **names = objc_copyClassNamesForImage(image, &count);
+  NSMutableString *report = [NSMutableString stringWithFormat:@"image %s, %u classes\n", image, count];
+  NSMutableArray *sorted = [NSMutableArray new];
+  for (unsigned i = 0; i < count; i++) [sorted addObject:[NSString stringWithUTF8String:names[i]]];
+  free(names);
+  [sorted sortUsingSelector:@selector(compare:)];
+  [report appendFormat:@"all classes: %@\n", [sorted componentsJoinedByString:@" "]];
+  NSUInteger written = 0;
+  for (NSString *name in sorted) {
+    BOOL match = keywords.count == 0;
+    for (NSString *keyword in keywords) if ([name rangeOfString:keyword options:NSCaseInsensitiveSearch].location != NSNotFound) match = YES;
+    if (!match) continue;
+    Class cls = NSClassFromString(name);
+    if (!cls) continue;
+    written++;
+    [report appendFormat:@"\n=== %@ : %@\n", name, NSStringFromClass(class_getSuperclass(cls))];
+    unsigned members = 0;
+    Ivar *ivars = class_copyIvarList(cls, &members);
+    for (unsigned i = 0; i < members; i++) [report appendFormat:@"  ivar %s %s\n", ivar_getName(ivars[i]), ivar_getTypeEncoding(ivars[i]) ? : "?"];
+    free(ivars);
+    for (int meta = 0; meta < 2; meta++) {
+      Method *methods = class_copyMethodList(meta ? object_getClass(cls) : cls, &members);
+      for (unsigned i = 0; i < MIN(members, 400u); i++) [report appendFormat:@"  %@ %@ %s\n", meta ? @"+" : @"-", NSStringFromSelector(method_getName(methods[i])), method_getTypeEncoding(methods[i]) ? : "?"];
+      free(methods);
+    }
+  }
+  [report writeToFile:[LMDumpsDirectory() stringByAppendingPathComponent:file] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+  LMStatusEvent(@"%@ is in %s: %u classes, %lu with methods saved in Dumps/%@", anchor, image, count, (unsigned long)written, file);
+}
+
 static void LMDumpICRClasses(void) {
   static dispatch_once_t once;
   dispatch_once(&once, ^{
@@ -728,6 +767,9 @@ static void LMDumpICRClasses(void) {
     NSString *path = [LMDumpsDirectory() stringByAppendingPathComponent:@"classes.txt"];
     [report writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
     LMStatusEvent(@"saved %lu IconServices/ICR classes in Dumps/classes.txt (%lu bytes)", (unsigned long)names.count, (unsigned long)report.length);
+    LMDumpImageClasses(@"ICRFinalizedIcon", @"framework-icr.txt", @[]);
+    LMDumpImageClasses(@"ISIconLayerGroup", @"framework-iconservices.txt", @[@"Icon", @"Layer", @"Compos", @"Render", @"Final", @"Serial", @"Recipe", @"Stack"]);
+    LMDumpImageClasses(@"CUINamedIconLayerStack", @"framework-coreui.txt", @[@"Icon", @"Layer", @"Stack", @"Storage", @"Mutable", @"Rendition"]);
   });
 }
 
