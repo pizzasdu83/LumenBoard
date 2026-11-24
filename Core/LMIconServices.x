@@ -1056,3 +1056,4 @@ static void LMImageAdded(const struct mach_header *header, intptr_t slide) {
     LMInstallIconHooks();
     if (!LMHooksInstalled) _dyld_register_func_for_add_image(LMImageAdded);
   }
+}
