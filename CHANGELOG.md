@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.8.1
-- Fixed icons not appearing in clear mode
+- **TRYING** to fix icons not appearing in clear mode
 - Changed pakage name to com.pizzasdu83.slipperyboard
 
 ## 1.8.0
