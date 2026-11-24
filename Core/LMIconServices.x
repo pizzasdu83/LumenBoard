@@ -880,10 +880,11 @@ static void LMLogStoreLookup(ISConcreteIcon *icon, id descriptor, IFImage *image
   if (!LMThemedIconIdentifier(self) || !completion) {
     if (completion && !LMThemedIconIdentifier(self)) {
       id sampleDescriptor = [descriptor copy];
-      %orig(descriptor, ^(id image) {
+      void (^sampling)(id) = ^(id image) {
         LMSampleStock(image, sampleDescriptor);
         completion(image);
-      });
+      };
+      %orig(descriptor, sampling);
       return;
     }
     %orig;
@@ -1055,4 +1056,3 @@ static void LMImageAdded(const struct mach_header *header, intptr_t slide) {
     LMInstallIconHooks();
     if (!LMHooksInstalled) _dyld_register_func_for_add_image(LMImageAdded);
   }
-}
