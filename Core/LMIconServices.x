@@ -483,7 +483,7 @@ static BOOL LMTestStock(ISConcreteIcon *icon, id descriptor) {
 static IFImage *LMOwnTintedImage(ISConcreteIcon *icon, id descriptor) {
   NSString *bundleIdentifier = LMThemedIconIdentifier(icon);
   if (!bundleIdentifier || LMRenderingStock || !descriptor) return nil;
-  BOOL testSolid = [bundleIdentifier isEqualToString:@"com.apple.calculator"]; // TEST: magenta
+  BOOL testSolid = NO;
   long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
   long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
   BOOL dark = NO;
@@ -660,14 +660,107 @@ static IFImage *LMTestSwap(ISConcreteIcon *icon, id descriptor, IFImage *stock) 
   return stock;
 }
 
-// TEST: what iOS itself gives for a tinted or clear icon of an app that has no theme
+// DIAGNOSTICS: what iOS itself gives for a tinted or clear icon of an app that has no theme. The stock image carries "layerData"
+// (tens of KB): that is probably what SpringBoard draws these modes from. It is described in the report and saved in Dumps/.
+static NSString *LMDumpsDirectory(void) {
+  NSString *directory = [LMDataDirectory stringByAppendingPathComponent:@"Dumps"];
+  [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
+  return directory;
+}
+
+static NSString *LMDescribeLayerData(NSData *data) {
+  NSMutableString *text = [NSMutableString new];
+  const uint8_t *bytes = data.bytes;
+  [text appendString:@"starts"];
+  for (NSUInteger i = 0; i < MIN(data.length, 12); i++) [text appendFormat:@" %02x", bytes[i]];
+  NSMutableString *ascii = [NSMutableString new];
+  for (NSUInteger i = 0; i < MIN(data.length, 12); i++) {
+    unichar character = (bytes[i] >= 32 && bytes[i] < 127) ? bytes[i] : '.';
+    [ascii appendString:[NSString stringWithCharacters:&character length:1]];
+  }
+  [text appendFormat:@" (%@)", ascii];
+  NSError *error = nil;
+  id plist = [NSPropertyListSerialization propertyListWithData:data options:NSPropertyListImmutable format:NULL error:&error];
+  if (plist) {
+    [text appendFormat:@"; plist %@", NSStringFromClass([plist class])];
+    if ([plist isKindOfClass:[NSDictionary class]]) {
+      NSDictionary *dictionary = plist;
+      [text appendFormat:@" keys: %@", [[dictionary.allKeys subarrayWithRange:NSMakeRange(0, MIN(dictionary.count, (NSUInteger)12))] componentsJoinedByString:@","]];
+      NSArray *objects = dictionary[@"$objects"];
+      if ([objects isKindOfClass:[NSArray class]]) {
+        NSMutableOrderedSet *classes = [NSMutableOrderedSet new];
+        for (id object in objects) if ([object isKindOfClass:[NSDictionary class]] && object[@"$classname"]) [classes addObject:object[@"$classname"]];
+        [text appendFormat:@"; archived classes: %@", [classes.array componentsJoinedByString:@","]];
+      }
+    }
+  } else {
+    [text appendString:@"; not a plist"];
+  }
+  return text;
+}
+
+static void LMDumpICRClasses(void) {
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    NSMutableString *report = [NSMutableString new];
+    unsigned classCount = 0;
+    Class *all = objc_copyClassList(&classCount);
+    NSMutableArray *names = [NSMutableArray new];
+    for (unsigned i = 0; i < classCount; i++) {
+      NSString *name = NSStringFromClass(all[i]);
+      if ([name hasPrefix:@"ICR"] || [name hasPrefix:@"IFImage"] || [name hasPrefix:@"IFCache"] || [name hasPrefix:@"IFConcrete"] || [name hasPrefix:@"ISImageDescriptor"] || [name hasPrefix:@"ISImageCache"] || [name hasPrefix:@"ISGenerationRequest"] || [name containsString:@"IconComposer"] || [name containsString:@"IconLayer"]) [names addObject:name];
+    }
+    free(all);
+    [names sortUsingSelector:@selector(compare:)];
+    for (NSString *name in names) {
+      Class cls = NSClassFromString(name);
+      [report appendFormat:@"\n=== %@ : %@\n", name, NSStringFromClass(class_getSuperclass(cls))];
+      unsigned count = 0;
+      Ivar *ivars = class_copyIvarList(cls, &count);
+      for (unsigned i = 0; i < count; i++) [report appendFormat:@"  ivar %s %s\n", ivar_getName(ivars[i]), ivar_getTypeEncoding(ivars[i]) ? : "?"];
+      free(ivars);
+      for (int meta = 0; meta < 2; meta++) {
+        Method *methods = class_copyMethodList(meta ? object_getClass(cls) : cls, &count);
+        for (unsigned i = 0; i < MIN(count, 500u); i++) [report appendFormat:@"  %@ %@ %s\n", meta ? @"+" : @"-", NSStringFromSelector(method_getName(methods[i])), method_getTypeEncoding(methods[i]) ? : "?"];
+        free(methods);
+      }
+    }
+    NSString *path = [LMDumpsDirectory() stringByAppendingPathComponent:@"classes.txt"];
+    [report writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    LMStatusEvent(@"saved %lu IconServices/ICR classes in Dumps/classes.txt (%lu bytes)", (unsigned long)names.count, (unsigned long)report.length);
+  });
+}
+
 static void LMSampleStock(IFImage *image, id descriptor) {
-  static int samples;
-  if (!image || samples >= 3 || !descriptor) return;
+  static NSMutableSet *sampled;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{ sampled = [NSMutableSet new]; });
+  if (!image || !descriptor) return;
   long long variant = [descriptor respondsToSelector:@selector(appearanceVariant)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearanceVariant)) : 0;
   if (variant != 2 && variant != 3) return;
-  samples++;
-  LMLogImage([NSString stringWithFormat:@"app without theme, variant %lld", variant], image);
+  long long appearance = [descriptor respondsToSelector:@selector(appearance)] ? ((long long (*)(id, SEL))objc_msgSend)(descriptor, @selector(appearance)) : 0;
+  NSString *key = [NSString stringWithFormat:@"a%lld-v%lld", appearance, variant];
+  @synchronized (sampled) {
+    if ([sampled containsObject:key] || sampled.count >= 4) return;
+    [sampled addObject:key];
+  }
+  LMLogImage([NSString stringWithFormat:@"app without theme, appearance %lld variant %lld", appearance, variant], image);
+  Ivar layerIvar = class_getInstanceVariable([image class], "_layerData");
+  NSData *layerData = layerIvar ? object_getIvar(image, layerIvar) : nil;
+  if ([layerData isKindOfClass:[NSData class]] && layerData.length) {
+    LMStatusEvent(@"layerData %@: %lu bytes, %@", key, (unsigned long)layerData.length, LMDescribeLayerData(layerData));
+    [layerData writeToFile:[LMDumpsDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"layerData-%@.bin", key]] atomically:YES];
+  }
+  CGImageRef cg = [image respondsToSelector:@selector(CGImage)] ? [image CGImage] : NULL;
+  if (cg) {
+    CGImageDestinationRef destination = CGImageDestinationCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:[LMDumpsDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"image-%@.png", key]]], (__bridge CFStringRef)@"public.png", 1, NULL);
+    if (destination) {
+      CGImageDestinationAddImage(destination, cg, NULL);
+      CGImageDestinationFinalize(destination);
+      CFRelease(destination);
+    }
+  }
+  LMDumpICRClasses();
 }
 
 // LMThemeIconRecipe: app icon recipe without the mask
